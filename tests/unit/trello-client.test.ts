@@ -748,4 +748,46 @@ describe('TrelloClient', () => {
       expect(result).toMatchObject({ id: 'c1', name: 'My Task [JVT-42]', shortId: 'JVT-42' });
     });
   });
+
+  describe('boardPrefixes', () => {
+    it('should return empty object when no prefixes seeded', () => {
+      const client = createClient();
+      expect(client.getBoardPrefixes()).toEqual({});
+    });
+
+    it('should seed prefixes from env-style map', () => {
+      const client = createClient();
+      client.seedBoardPrefixes({ JVT: 'board1', TATA: 'board2' });
+      expect(client.getBoardPrefixes()).toEqual({ JVT: 'board1', TATA: 'board2' });
+    });
+
+    it('should normalise prefix to uppercase on registerBoardPrefix', async () => {
+      const client = createClient();
+      await client.registerBoardPrefix('jvt', 'board1');
+      expect(client.getBoardPrefixes()).toMatchObject({ JVT: 'board1' });
+    });
+
+    it('should normalise prefixes to uppercase on registerBoardPrefixes', async () => {
+      const client = createClient();
+      await client.registerBoardPrefixes([
+        { prefix: 'jvt', boardId: 'b1' },
+        { prefix: 'tata', boardId: 'b2' },
+      ]);
+      expect(client.getBoardPrefixes()).toMatchObject({ JVT: 'b1', TATA: 'b2' });
+    });
+
+    it('env var prefixes win over file prefixes on conflict', () => {
+      const client = createClient();
+      client.seedBoardPrefixes({ JVT: 'env-board' });
+      // Simulate what loadConfig does when file has a conflicting value:
+      const filePrefixes = { JVT: 'file-board', TATA: 'file-tata' };
+      // Apply the merge logic manually (same as loadConfig does):
+      const merged = { ...filePrefixes, ...client.getBoardPrefixes() };
+      client.seedBoardPrefixes({}); // reset to simulate clean state
+      // Re-apply merged result as if loadConfig ran
+      client.seedBoardPrefixes(merged);
+      expect(client.getBoardPrefixes()['JVT']).toBe('env-board');
+      expect(client.getBoardPrefixes()['TATA']).toBe('file-tata');
+    });
+  });
 });

@@ -50,6 +50,7 @@ export class TrelloClient {
   private rateLimiter;
   private defaultBoardId?: string;
   private activeConfig: TrelloConfig;
+  private boardPrefixes: Record<string, string> = {};
 
   constructor(private config: TrelloConfig) {
     this.defaultBoardId = config.defaultBoardId;
@@ -105,6 +106,10 @@ export class TrelloClient {
       if (savedConfig.workspaceId) {
         this.activeConfig.workspaceId = savedConfig.workspaceId;
       }
+      if (savedConfig.boardPrefixes && typeof savedConfig.boardPrefixes === 'object') {
+        // Merge: file fills in gaps, env values already present take priority
+        this.boardPrefixes = { ...savedConfig.boardPrefixes, ...this.boardPrefixes };
+      }
     } catch (error) {
       // File might not exist yet, that's okay
       if (error instanceof Error && 'code' in error && error.code !== 'ENOENT') {
@@ -122,6 +127,7 @@ export class TrelloClient {
       const configToSave = {
         boardId: this.activeConfig.boardId,
         workspaceId: this.activeConfig.workspaceId,
+        boardPrefixes: this.boardPrefixes,
       };
       await fs.writeFile(CONFIG_FILE, JSON.stringify(configToSave, null, 2));
     } catch (error) {
@@ -153,6 +159,38 @@ export class TrelloClient {
     this.activeConfig.boardId = boardId;
     await this.saveConfig();
     return board;
+  }
+
+  /**
+   * Seed board prefixes from an env-style map (called before loadConfig)
+   */
+  seedBoardPrefixes(prefixes: Record<string, string>): void {
+    Object.assign(this.boardPrefixes, prefixes);
+  }
+
+  /**
+   * Get a copy of all registered board prefixes
+   */
+  getBoardPrefixes(): Record<string, string> {
+    return { ...this.boardPrefixes };
+  }
+
+  /**
+   * Register a single board prefix and persist to config
+   */
+  async registerBoardPrefix(prefix: string, boardId: string): Promise<void> {
+    this.boardPrefixes[prefix.trim().toUpperCase()] = boardId;
+    await this.saveConfig();
+  }
+
+  /**
+   * Register multiple board prefixes and persist to config
+   */
+  async registerBoardPrefixes(mappings: Array<{ prefix: string; boardId: string }>): Promise<void> {
+    for (const { prefix, boardId } of mappings) {
+      this.boardPrefixes[prefix.trim().toUpperCase()] = boardId;
+    }
+    await this.saveConfig();
   }
 
   /**

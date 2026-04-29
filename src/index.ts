@@ -9,19 +9,11 @@ class TrelloServer {
   private server: McpServer;
   private trelloClient: TrelloClient;
   private healthEndpoints: TrelloHealthEndpoints;
-  private boardPrefixes: Record<string, string> = {};
 
   constructor() {
     const apiKey = process.env.TRELLO_API_KEY;
     const token = process.env.TRELLO_TOKEN;
     const defaultBoardId = process.env.TRELLO_BOARD_ID;
-
-    if (process.env.BOARD_PREFIXES) {
-      process.env.BOARD_PREFIXES.split(',').forEach(pair => {
-        const [prefix, boardId] = pair.trim().split(':');
-        if (prefix && boardId) this.boardPrefixes[prefix.trim()] = boardId.trim();
-      });
-    }
 
     if (!apiKey || !token) {
       throw new Error('TRELLO_API_KEY and TRELLO_TOKEN environment variables are required');
@@ -33,6 +25,15 @@ class TrelloServer {
       defaultBoardId,
       boardId: defaultBoardId,
     });
+
+    if (process.env.BOARD_PREFIXES) {
+      const envPrefixes: Record<string, string> = {};
+      process.env.BOARD_PREFIXES.split(',').forEach(pair => {
+        const [prefix, boardId] = pair.trim().split(':');
+        if (prefix && boardId) envPrefixes[prefix.trim().toUpperCase()] = boardId.trim();
+      });
+      this.trelloClient.seedBoardPrefixes(envPrefixes);
+    }
 
     this.healthEndpoints = new TrelloHealthEndpoints(this.trelloClient);
 
@@ -448,8 +449,8 @@ class TrelloServer {
         try {
           // Auto-resolve boardId from prefix (e.g. "JVT" from "JVT-4") if not provided
           const boardId = args.boardId ?? (() => {
-            const prefix = args.shortId.split('-')[0];
-            return this.boardPrefixes[prefix];
+            const prefix = args.shortId.split('-')[0].toUpperCase();
+            return this.trelloClient.getBoardPrefixes()[prefix];
           })();
           const card = await this.trelloClient.findCardByShortId(args.shortId, boardId);
           if (!card) {
@@ -457,6 +458,79 @@ class TrelloServer {
           }
           return {
             content: [{ type: 'text' as const, text: JSON.stringify(card, null, 2) }],
+          };
+        } catch (error) {
+          return this.handleError(error);
+        }
+      }
+    );
+
+    // List all registered board prefixes
+    this.server.registerTool(
+      'list_board_prefixes',
+      {
+        title: 'List Board Prefixes',
+        description: 'List all registered board prefix → boardId mappings. Includes prefixes from BOARD_PREFIXES env var and any registered at runtime.',
+        inputSchema: {},
+      },
+      async () => {
+        try {
+          const prefixes = this.trelloClient.getBoardPrefixes();
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify(prefixes, null, 2) }],
+          };
+        } catch (error) {
+          return this.handleError(error);
+        }
+      }
+    );
+
+    // Register a single board prefix
+    this.server.registerTool(
+      'register_board_prefix',
+      {
+        title: 'Register Board Prefix',
+        description: 'Register a board prefix → boardId mapping. Takes effect immediately and persists across server restarts. Use list_boards to find board IDs.',
+        inputSchema: {
+          prefix: z.string().describe('Short prefix for the board (e.g. "JVT"). Stored as uppercase.'),
+          boardId: z.string().describe('Trello board ID to associate with this prefix.'),
+        },
+      },
+      async args => {
+        try {
+          await this.trelloClient.registerBoardPrefix(args.prefix, args.boardId);
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify({ registered: { [args.prefix.toUpperCase()]: args.boardId } }, null, 2) }],
+          };
+        } catch (error) {
+          return this.handleError(error);
+        }
+      }
+    );
+
+    // Register multiple board prefixes at once
+    this.server.registerTool(
+      'setup_board_prefixes',
+      {
+        title: 'Setup Board Prefixes',
+        description: 'Register multiple board prefix → boardId mappings in one call. Takes effect immediately and persists across server restarts. Call list_boards first to get board IDs.',
+        inputSchema: {
+          mappings: z.array(
+            z.object({
+              prefix: z.string().describe('Short prefix (e.g. "JVT"). Stored as uppercase.'),
+              boardId: z.string().describe('Trello board ID.'),
+            })
+          ).describe('Array of prefix → boardId mappings to register.'),
+        },
+      },
+      async args => {
+        try {
+          await this.trelloClient.registerBoardPrefixes(args.mappings);
+          const result = Object.fromEntries(
+            args.mappings.map(m => [m.prefix.toUpperCase(), m.boardId])
+          );
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify({ registered: result }, null, 2) }],
           };
         } catch (error) {
           return this.handleError(error);
