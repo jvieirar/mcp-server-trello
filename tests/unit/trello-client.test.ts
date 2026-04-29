@@ -261,7 +261,27 @@ describe('TrelloClient', () => {
       const client = createClient();
       await client.getMyCards();
 
-      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/members/me/cards');
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/members/me/cards', {
+        params: { filter: 'open' },
+      });
+    });
+
+    it('should pass filter=open and default fields by default', async () => {
+      mockAxiosInstance.get.mockResolvedValueOnce({ data: [] });
+      const client = createClient();
+      await client.getMyCards();
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/members/me/cards', {
+        params: { filter: 'open' },
+      });
+    });
+
+    it('should pass explicit fields and filter when provided', async () => {
+      mockAxiosInstance.get.mockResolvedValueOnce({ data: [] });
+      const client = createClient();
+      await client.getMyCards('name,idShort', 'all');
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/members/me/cards', {
+        params: { filter: 'all', fields: 'name,idShort' },
+      });
     });
   });
 

@@ -411,9 +411,11 @@ export class TrelloClient {
     });
   }
 
-  async getMyCards(): Promise<TrelloCard[]> {
+  async getMyCards(fields?: string, filter = 'open'): Promise<TrelloCard[]> {
     return this.handleRequest(async () => {
-      const response = await this.axiosInstance.get('/members/me/cards');
+      const params: Record<string, string> = { filter };
+      if (fields) params.fields = fields;
+      const response = await this.axiosInstance.get('/members/me/cards', { params });
       return response.data;
     });
   }

@@ -376,11 +376,18 @@ class TrelloServer {
       {
         title: 'Get My Cards',
         description: 'Fetch all cards assigned to the current user',
-        inputSchema: {},
+        inputSchema: {
+          fields: z.string().optional().describe(
+            'Comma-separated card fields to return (default: name,idShort,idBoard,idList,labels,due,dueComplete)'
+          ),
+          filter: z.string().optional().describe('Card filter: open (default), closed, or all'),
+        },
       },
-      async () => {
+      async ({ fields, filter }) => {
         try {
-          const cards = await this.trelloClient.getMyCards();
+          const effectiveFields = fields ?? 'name,idShort,idBoard,idList,labels,due,dueComplete';
+          const effectiveFilter = filter ?? 'open';
+          const cards = await this.trelloClient.getMyCards(effectiveFields, effectiveFilter);
           return {
             content: [{ type: 'text' as const, text: JSON.stringify(cards, null, 2) }],
           };
