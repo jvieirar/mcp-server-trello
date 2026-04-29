@@ -18,6 +18,40 @@ During a 152-comment card migration job the original server was generating 3–5
 | `jv_get_card` | Always fetches everything | `lightweight` param for slim lookups | Full mode still available when needed |
 | `jv_search_cards` | Did not exist | New tool hitting `/search` directly | Find cards without fetching an entire list |
 | Short ID system | Did not exist | `[PREFIX-N]` suffix on card names + resolver | Human-readable card references across sessions |
+| `jv_archive_card` response | Full card object (~850 tokens) | `{ id, closed: true }` | Agent only needs confirmation |
+
+### Benchmark — `trello` vs `trello-jv`
+
+Real-world session moving 9 cards across lists with comments and an archive step.
+
+#### Session-level results
+
+| Metric | `trello` (original) | `trello-jv` (optimized) | Delta |
+|--------|--------------------|-----------------------|-------|
+| **Total session tokens** | 30,216 | 20,886 | **−31%** |
+| **Duration** | 102,029 ms | 71,732 ms | **−30%** |
+| Trello API calls | 9 | 9 | — |
+
+#### Per-call payload breakdown
+
+| # | Step | `trello` tokens | `trello-jv` tokens | Reduction |
+|---|------|-----------------|--------------------|-----------|
+| 1 | `list_boards` | ~8,500 | ~90 | **−99%** |
+| 2 | `get_lists` | ~120 | ~30 | −75% |
+| 3 | `add_card_to_list` | ~950 | ~35 | **−96%** |
+| 4 | `add_comment` | ~750 | ~10 | **−99%** |
+| 5 | `move_card` | ~850 | ~15 | **−98%** |
+| 6 | `add_comment` | ~750 | ~10 | **−99%** |
+| 7 | `move_card` | ~850 | ~15 | **−98%** |
+| 8 | `add_comment` | ~750 | ~10 | **−99%** |
+| 9 | `archive_card` | ~850 | ~10 | **−99%** |
+| | **Total** | **~14,370** | **~225** | **−98%** |
+
+The dominant waste in the original server is `list_boards` alone — 59% of all output tokens from a single discovery call. Every mutation (add, move, comment, archive) returns a full card or action object even though the agent only needs to know "did it work?"
+
+`trello-jv` shapes every response for agent consumers, not UI renders: mutations return confirmation fields only, discovery calls return identification fields only.
+
+> **Note on duration:** the 30% wall-clock improvement reflects both leaner payloads and normal run-to-run variance. More runs would be needed to isolate the pure payload effect. The 98% payload reduction is structural and reproducible.
 
 ### Setup and prerequisites
 
