@@ -27,14 +27,33 @@ During a 152-comment card migration job the original server was generating 3–5
 
 **For the short ID system** — the prefix registry is managed at runtime. No restart is ever needed.
 
-**MCP config (local fork, runs source directly — no build step needed):**
+**MCP config — with `.env.local` in the repo (no credentials in config):**
+
+Use `--cwd` so Bun sets the working directory to the repo root and picks up `.env.local` automatically:
 
 ```json
 {
   "mcpServers": {
     "trello-jv": {
       "command": "bun",
-      "args": ["run", "/Users/juanvieira/development/codebases/tools/mcp-server-trello/src/index.ts"],
+      "args": ["--cwd", "/Users/juanvieira/development/codebases/tools/mcp-server-trello", "run", "src/index.ts"]
+    }
+  }
+}
+```
+
+```bash
+claude mcp add trello-jv -- bun --cwd /Users/juanvieira/development/codebases/tools/mcp-server-trello run src/index.ts
+```
+
+**MCP config — with explicit env vars (no `.env.local` required):**
+
+```json
+{
+  "mcpServers": {
+    "trello-jv": {
+      "command": "bun",
+      "args": ["--cwd", "/Users/juanvieira/development/codebases/tools/mcp-server-trello", "run", "src/index.ts"],
       "env": {
         "TRELLO_API_KEY": "your-api-key",
         "TRELLO_TOKEN": "your-token"
@@ -44,10 +63,8 @@ During a 152-comment card migration job the original server was generating 3–5
 }
 ```
 
-Or add it via the Claude CLI:
-
 ```bash
-claude mcp add --env TRELLO_API_KEY=your-key --env TRELLO_TOKEN=your-token trello-jv -- bun run /Users/juanvieira/development/codebases/tools/mcp-server-trello/src/index.ts
+claude mcp add --env TRELLO_API_KEY=your-key --env TRELLO_TOKEN=your-token trello-jv -- bun --cwd /Users/juanvieira/development/codebases/tools/mcp-server-trello run src/index.ts
 ```
 
 **Optional: seed prefixes from the env var** (useful for CI/scripted setups):
