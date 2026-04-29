@@ -132,7 +132,7 @@ export class TrelloClient {
       await fs.writeFile(CONFIG_FILE, JSON.stringify(configToSave, null, 2));
     } catch (error) {
       // Failed to save configuration
-      throw new Error('Failed to save configuration');
+      throw new Error(`Failed to save configuration: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

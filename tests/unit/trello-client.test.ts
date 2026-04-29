@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import axios from 'axios';
+import * as fs from 'fs/promises';
 import { TrelloClient } from '../../src/trello-client.js';
 
 // Shared mock instance that axios.create will return
@@ -776,18 +777,20 @@ describe('TrelloClient', () => {
       expect(client.getBoardPrefixes()).toMatchObject({ JVT: 'b1', TATA: 'b2' });
     });
 
-    it('env var prefixes win over file prefixes on conflict', () => {
+    it('env var prefixes win over file prefixes on conflict', async () => {
+      const fileConfig = JSON.stringify({
+        boardPrefixes: { JVT: 'file-board', TATA: 'file-tata' },
+      });
+      vi.spyOn(fs, 'readFile').mockResolvedValueOnce(fileConfig as any);
+      vi.spyOn(fs, 'mkdir').mockResolvedValue(undefined as any);
+
       const client = createClient();
-      client.seedBoardPrefixes({ JVT: 'env-board' });
-      // Simulate what loadConfig does when file has a conflicting value:
-      const filePrefixes = { JVT: 'file-board', TATA: 'file-tata' };
-      // Apply the merge logic manually (same as loadConfig does):
-      const merged = { ...filePrefixes, ...client.getBoardPrefixes() };
-      client.seedBoardPrefixes({}); // reset to simulate clean state
-      // Re-apply merged result as if loadConfig ran
-      client.seedBoardPrefixes(merged);
-      expect(client.getBoardPrefixes()['JVT']).toBe('env-board');
-      expect(client.getBoardPrefixes()['TATA']).toBe('file-tata');
+      client.seedBoardPrefixes({ JVT: 'env-board' }); // env wins
+      await client.loadConfig();
+
+      const prefixes = client.getBoardPrefixes();
+      expect(prefixes['JVT']).toBe('env-board');   // env beats file
+      expect(prefixes['TATA']).toBe('file-tata');  // file fills gap
     });
   });
 });
