@@ -36,14 +36,14 @@ Use `--cwd` so Bun sets the working directory to the repo root and picks up `.en
   "mcpServers": {
     "trello-jv": {
       "command": "bun",
-      "args": ["--cwd", "/Users/juanvieira/development/codebases/tools/mcp-server-trello", "run", "src/index.ts"]
+      "args": ["run", "--cwd", "/Users/juanvieira/development/codebases/tools/mcp-server-trello", "src/index.ts"]
     }
   }
 }
 ```
 
 ```bash
-claude mcp add trello-jv -- bun --cwd /Users/juanvieira/development/codebases/tools/mcp-server-trello run src/index.ts
+claude mcp add trello-jv -- bun run --cwd /Users/juanvieira/development/codebases/tools/mcp-server-trello src/index.ts
 ```
 
 **MCP config — with explicit env vars (no `.env.local` required):**
@@ -53,7 +53,7 @@ claude mcp add trello-jv -- bun --cwd /Users/juanvieira/development/codebases/to
   "mcpServers": {
     "trello-jv": {
       "command": "bun",
-      "args": ["--cwd", "/Users/juanvieira/development/codebases/tools/mcp-server-trello", "run", "src/index.ts"],
+      "args": ["run", "--cwd", "/Users/juanvieira/development/codebases/tools/mcp-server-trello", "src/index.ts"],
       "env": {
         "TRELLO_API_KEY": "your-api-key",
         "TRELLO_TOKEN": "your-token"
@@ -64,7 +64,7 @@ claude mcp add trello-jv -- bun --cwd /Users/juanvieira/development/codebases/to
 ```
 
 ```bash
-claude mcp add --env TRELLO_API_KEY=your-key --env TRELLO_TOKEN=your-token trello-jv -- bun --cwd /Users/juanvieira/development/codebases/tools/mcp-server-trello run src/index.ts
+claude mcp add --env TRELLO_API_KEY=your-key --env TRELLO_TOKEN=your-token trello-jv -- bun run --cwd /Users/juanvieira/development/codebases/tools/mcp-server-trello src/index.ts
 ```
 
 **Optional: seed prefixes from the env var** (useful for CI/scripted setups):
