@@ -15,6 +15,14 @@ class TrelloServer {
     const token = process.env.TRELLO_TOKEN;
     const defaultBoardId = process.env.TRELLO_BOARD_ID;
 
+    const BOARD_PREFIXES: Record<string, string> = {};
+    if (process.env.BOARD_PREFIXES) {
+      process.env.BOARD_PREFIXES.split(',').forEach(pair => {
+        const [prefix, boardId] = pair.split(':');
+        if (prefix && boardId) BOARD_PREFIXES[prefix] = boardId.trim();
+      });
+    }
+
     if (!apiKey || !token) {
       throw new Error('TRELLO_API_KEY and TRELLO_TOKEN environment variables are required');
     }
@@ -175,11 +183,15 @@ class TrelloServer {
             .array(z.string())
             .optional()
             .describe('Array of label IDs to apply to the card'),
+          boardPrefix: z.string().optional().describe('Board prefix for short ID (e.g. "JVT"). Requires BOARD_PREFIXES env var to be set.'),
         },
       },
       async args => {
         try {
-          const card = await this.trelloClient.addCard(args.boardId, args);
+          const card = await this.trelloClient.addCard(args.boardId, {
+            ...args,
+            boardPrefix: args.boardPrefix,
+          });
           return {
             content: [{ type: 'text' as const, text: JSON.stringify(card, null, 2) }],
           };
@@ -417,6 +429,29 @@ class TrelloServer {
           const cards = await this.trelloClient.searchCards(query, boardIds, limit);
           return {
             content: [{ type: 'text' as const, text: JSON.stringify(cards, null, 2) }],
+          };
+        } catch (error) {
+          return this.handleError(error);
+        }
+      }
+    );
+
+    // Find a card by its short ID (e.g. "JVT-4")
+    this.server.registerTool(
+      'find_card_by_short_id',
+      {
+        title: 'Find Card by Short ID',
+        description: 'Find a card by its short ID (e.g. "JVT-4")',
+        inputSchema: {
+          shortId: z.string().describe('Short ID of the card (e.g. "JVT-4")'),
+          boardId: z.string().optional().describe('Limit search to this board ID'),
+        },
+      },
+      async args => {
+        try {
+          const card = await this.trelloClient.findCardByShortId(args.shortId, args.boardId);
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify(card, null, 2) }],
           };
         } catch (error) {
           return this.handleError(error);

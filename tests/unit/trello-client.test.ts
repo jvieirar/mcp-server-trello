@@ -701,4 +701,51 @@ describe('TrelloClient', () => {
       expect(result).toEqual([]);
     });
   });
+
+  describe('findCardByShortId', () => {
+    it('should search by bracketed shortId', async () => {
+      mockAxiosInstance.get.mockResolvedValue({ data: { cards: [{ id: 'c1', name: 'Task [JVT-4]' }] } });
+      const client = createClient();
+      const result = await client.findCardByShortId('JVT-4');
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/search', {
+        params: { query: '[JVT-4]', modelTypes: 'cards', cards_limit: 1, card_fields: 'id,name,idShort,idList,idBoard,shortUrl' },
+      });
+      expect(result).toEqual({ id: 'c1', name: 'Task [JVT-4]' });
+    });
+
+    it('should return null when no card found', async () => {
+      mockAxiosInstance.get.mockResolvedValue({ data: { cards: [] } });
+      const client = createClient();
+      const result = await client.findCardByShortId('JVT-99');
+      expect(result).toBeNull();
+    });
+
+    it('should pass boardId to idBoards when provided', async () => {
+      mockAxiosInstance.get.mockResolvedValue({ data: { cards: [] } });
+      const client = createClient();
+      await client.findCardByShortId('JVT-4', 'board1');
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/search', {
+        params: expect.objectContaining({ idBoards: 'board1' }),
+      });
+    });
+  });
+
+  describe('addCard with boardPrefix', () => {
+    it('should append short ID to card name when boardPrefix is provided', async () => {
+      // First POST returns the created card with idShort
+      mockAxiosInstance.post.mockResolvedValue({ data: { id: 'c1', name: 'My Task', idShort: 42 } });
+      // Second PUT renames the card
+      mockAxiosInstance.put.mockResolvedValue({ data: { id: 'c1', name: 'My Task [JVT-42]', idShort: 42 } });
+
+      const client = createClient({ boardId: 'board1' });
+      const result = await client.addCard('board1', {
+        listId: 'list1',
+        name: 'My Task',
+        boardPrefix: 'JVT',
+      });
+
+      expect(mockAxiosInstance.put).toHaveBeenCalledWith('/cards/c1', { name: 'My Task [JVT-42]' });
+      expect(result).toMatchObject({ id: 'c1', name: 'My Task [JVT-42]', shortId: 'JVT-42' });
+    });
+  });
 });

@@ -316,8 +316,9 @@ export class TrelloClient {
       dueDate?: string;
       start?: string;
       labels?: string[];
+      boardPrefix?: string;
     }
-  ): Promise<TrelloCard> {
+  ): Promise<TrelloCard & { shortId?: string }> {
     return this.handleRequest(async () => {
       const response = await this.axiosInstance.post('/cards', {
         idList: params.listId,
@@ -327,7 +328,16 @@ export class TrelloClient {
         start: params.start,
         idLabels: params.labels,
       });
-      return response.data;
+      const card = response.data;
+
+      if (params.boardPrefix) {
+        const shortId = `${params.boardPrefix}-${card.idShort}`;
+        const updatedName = `${card.name} [${shortId}]`;
+        const putResponse = await this.axiosInstance.put(`/cards/${card.id}`, { name: updatedName });
+        return { ...putResponse.data, shortId };
+      }
+
+      return card;
     });
   }
 
@@ -1249,6 +1259,23 @@ export class TrelloClient {
       if (boardIds?.length) params.idBoards = boardIds.join(',');
       const response = await this.axiosInstance.get('/search', { params });
       return response.data.cards ?? [];
+    });
+  }
+
+  /**
+   * Find a card by its short ID (e.g. "JVT-4")
+   */
+  async findCardByShortId(shortId: string, boardId?: string): Promise<TrelloCardSearchResult | null> {
+    return this.handleRequest(async () => {
+      const params: Record<string, string | number> = {
+        query: `[${shortId}]`,
+        modelTypes: 'cards',
+        cards_limit: 1,
+        card_fields: 'id,name,idShort,idList,idBoard,shortUrl',
+      };
+      if (boardId) params.idBoards = boardId;
+      const response = await this.axiosInstance.get('/search', { params });
+      return response.data.cards?.[0] ?? null;
     });
   }
 
