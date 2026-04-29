@@ -750,11 +750,16 @@ class TrelloServer {
             .optional()
             .default(false)
             .describe('Whether to return card description in markdown format (default: false)'),
+          lightweight: z
+            .boolean()
+            .optional()
+            .default(false)
+            .describe('Whether to fetch only essential fields (default: false)'),
         },
       },
-      async ({ cardId, includeMarkdown }) => {
+      async ({ cardId, includeMarkdown, lightweight }) => {
         try {
-          const card = await this.trelloClient.getCard(cardId, includeMarkdown);
+          const card = await this.trelloClient.getCard(cardId, includeMarkdown, lightweight);
           return {
             content: [{ type: 'text' as const, text: JSON.stringify(card, null, 2) }],
           };

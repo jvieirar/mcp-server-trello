@@ -618,6 +618,24 @@ describe('TrelloClient', () => {
         }),
       });
     });
+
+    it('should use slim params when lightweight=true', async () => {
+      mockAxiosInstance.get.mockResolvedValue({ data: { id: 'card1', name: 'Test' } });
+      const client = createClient({ boardId: 'board1' });
+      await client.getCard('card1', false, true);
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/cards/card1', {
+        params: { fields: 'id,name,desc,idList,idBoard,labels,due,dueComplete,shortUrl' },
+      });
+    });
+
+    it('should use full params when lightweight=false (default)', async () => {
+      mockAxiosInstance.get.mockResolvedValue({ data: { id: 'card1', name: 'Test' } });
+      const client = createClient({ boardId: 'board1' });
+      await client.getCard('card1');
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/cards/card1', {
+        params: expect.objectContaining({ fields: 'all', attachments: true, checklists: 'all' }),
+      });
+    });
   });
 
   describe('getCardHistory', () => {

@@ -552,26 +552,31 @@ export class TrelloClient {
 
   async getCard(
     cardId: string,
-    includeMarkdown: boolean = false
+    includeMarkdown: boolean = false,
+    lightweight: boolean = false
   ): Promise<EnhancedTrelloCard | string> {
     return this.handleRequest(async () => {
+      const params = lightweight
+        ? { fields: 'id,name,desc,idList,idBoard,labels,due,dueComplete,shortUrl' }
+        : {
+            attachments: true,
+            checklists: 'all',
+            checkItemStates: true,
+            members: true,
+            membersVoted: true,
+            labels: true,
+            actions: 'commentCard',
+            actions_limit: 100,
+            fields: 'all',
+            customFieldItems: true,
+            list: true,
+            board: true,
+            stickers: true,
+            pluginData: true,
+          };
+
       const response = await this.axiosInstance.get(`/cards/${cardId}`, {
-        params: {
-          attachments: true,
-          checklists: 'all',
-          checkItemStates: true,
-          members: true,
-          membersVoted: true,
-          labels: true,
-          actions: 'commentCard',
-          actions_limit: 100,
-          fields: 'all',
-          customFieldItems: true,
-          list: true,
-          board: true,
-          stickers: true,
-          pluginData: true,
-        },
+        params,
       });
 
       const cardData: EnhancedTrelloCard = response.data;
