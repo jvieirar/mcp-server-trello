@@ -1,5 +1,82 @@
 # MCP Server Trello
 
+## Custom performance improvements
+
+This fork adds response-size optimizations and new tools that significantly reduce token usage in agentic workflows. All changes are backwards-compatible — existing tool calls work without modification.
+
+### What changed and why
+
+During a 152-comment card migration job the original server was generating 3–5 KB per mutation call. Seven targeted changes cut that down:
+
+| Change | Before | After | Why |
+|--------|--------|-------|-----|
+| `add_comment` response | Full Trello action object (~4 KB) | `{ id }` | Agent only needs confirmation |
+| `move_card` response | Full card object | `{ id, idList }` | Agent only needs the new location |
+| `update_card_details` response | Full card object | `{ id }` | Agent only needs confirmation |
+| `get_my_cards` | All fields, all statuses | Slim fields, open cards only (configurable) | Dramatically smaller list responses |
+| `get_lists` | All list fields | `id, name` only (configurable) | Agents almost never need more |
+| `get_card` | Always fetches everything | `lightweight` param for slim lookups | Full mode still available when needed |
+| `search_cards` | Did not exist | New tool hitting `/search` directly | Find cards without fetching an entire list |
+| Short ID system | Did not exist | `[PREFIX-N]` suffix on card names + resolver | Human-readable card references across sessions |
+
+### Setup and prerequisites
+
+**Required:**
+- [Bun](https://bun.sh) v1.0+
+- A Trello API key and token (see [Configuration](#configuration))
+
+**For the short ID system** — set `BOARD_PREFIXES` in your MCP server env:
+
+```
+BOARD_PREFIXES=JVT:boardId1,TATA:boardId2
+```
+
+Format: `PREFIX:trelloBoardId` pairs separated by commas. The prefix becomes the human-readable namespace (e.g. `JVT-4`). Get board IDs from `list_boards`.
+
+**Full MCP config with all options:**
+
+```json
+{
+  "mcpServers": {
+    "trello": {
+      "command": "bunx",
+      "args": ["@delorenj/mcp-server-trello"],
+      "env": {
+        "TRELLO_API_KEY": "your-api-key",
+        "TRELLO_TOKEN": "your-token",
+        "TRELLO_BOARD_ID": "optional-default-board-id",
+        "BOARD_PREFIXES": "JVT:boardId1,TATA:boardId2"
+      }
+    }
+  }
+}
+```
+
+### Agent skill
+
+A Claude Code agent skill is included at [`skills/trello-mcp-agent.md`](skills/trello-mcp-agent.md). Load it to get tool-selection guidance, short ID patterns, and efficient workflow recipes.
+
+**Quick usage examples:**
+
+```json
+// Lightweight card lookup (no comments/checklists — ~90% smaller)
+{ "name": "get_card", "arguments": { "cardId": "abc123", "lightweight": true } }
+
+// Search without fetching a list
+{ "name": "search_cards", "arguments": { "query": "fix auth bug", "limit": 5 } }
+
+// Create a card with a short ID (name becomes "Fix auth bug [JVT-42]")
+{ "name": "add_card_to_list", "arguments": { "listId": "list-id", "name": "Fix auth bug", "boardPrefix": "JVT" } }
+
+// Resolve a short ID to a card
+{ "name": "find_card_by_short_id", "arguments": { "shortId": "JVT-42" } }
+
+// Slim open cards assigned to me
+{ "name": "get_my_cards", "arguments": { "filter": "open", "fields": "name,idShort,idList,labels,due" } }
+```
+
+---
+
 [![Verified on MseeP](https://mseep.ai/badge.svg)](https://mseep.ai/app/27359682-7632-4ba7-981d-7dfecadf1c4b)
 [![MCP Registry](https://img.shields.io/badge/MCP-Registry-blue)](https://registry.modelcontextprotocol.io/servers/io.github.delorenj/mcp-server-trello)
 [![npm version](https://badge.fury.io/js/%40delorenj%2Fmcp-server-trello.svg)](https://badge.fury.io/js/%40delorenj%2Fmcp-server-trello)
