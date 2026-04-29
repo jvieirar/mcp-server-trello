@@ -9,17 +9,17 @@ class TrelloServer {
   private server: McpServer;
   private trelloClient: TrelloClient;
   private healthEndpoints: TrelloHealthEndpoints;
+  private boardPrefixes: Record<string, string> = {};
 
   constructor() {
     const apiKey = process.env.TRELLO_API_KEY;
     const token = process.env.TRELLO_TOKEN;
     const defaultBoardId = process.env.TRELLO_BOARD_ID;
 
-    const BOARD_PREFIXES: Record<string, string> = {};
     if (process.env.BOARD_PREFIXES) {
       process.env.BOARD_PREFIXES.split(',').forEach(pair => {
-        const [prefix, boardId] = pair.split(':');
-        if (prefix && boardId) BOARD_PREFIXES[prefix] = boardId.trim();
+        const [prefix, boardId] = pair.trim().split(':');
+        if (prefix && boardId) this.boardPrefixes[prefix.trim()] = boardId.trim();
       });
     }
 
@@ -188,10 +188,7 @@ class TrelloServer {
       },
       async args => {
         try {
-          const card = await this.trelloClient.addCard(args.boardId, {
-            ...args,
-            boardPrefix: args.boardPrefix,
-          });
+          const card = await this.trelloClient.addCard(args.boardId, args);
           return {
             content: [{ type: 'text' as const, text: JSON.stringify(card, null, 2) }],
           };
@@ -449,7 +446,15 @@ class TrelloServer {
       },
       async args => {
         try {
-          const card = await this.trelloClient.findCardByShortId(args.shortId, args.boardId);
+          // Auto-resolve boardId from prefix (e.g. "JVT" from "JVT-4") if not provided
+          const boardId = args.boardId ?? (() => {
+            const prefix = args.shortId.split('-')[0];
+            return this.boardPrefixes[prefix];
+          })();
+          const card = await this.trelloClient.findCardByShortId(args.shortId, boardId);
+          if (!card) {
+            return { content: [{ type: 'text' as const, text: `No card found with short ID: ${args.shortId}` }] };
+          }
           return {
             content: [{ type: 'text' as const, text: JSON.stringify(card, null, 2) }],
           };
