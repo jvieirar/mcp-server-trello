@@ -1235,6 +1235,23 @@ export class TrelloClient {
   }
 
   /**
+   * Search for cards across Trello
+   */
+  async searchCards(query: string, boardIds?: string[], limit = 10): Promise<TrelloCard[]> {
+    return this.handleRequest(async () => {
+      const params: Record<string, string | number> = {
+        query,
+        modelTypes: 'cards',
+        cards_limit: limit,
+        card_fields: 'id,name,idShort,idList,idBoard,shortUrl',
+      };
+      if (boardIds?.length) params.idBoards = boardIds.join(',');
+      const response = await this.axiosInstance.get('/search', { params });
+      return response.data.cards ?? [];
+    });
+  }
+
+  /**
    * Download an attachment from a card with authentication
    * Returns base64-encoded data along with metadata
    */

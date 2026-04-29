@@ -400,6 +400,30 @@ class TrelloServer {
       }
     );
 
+    // Search for cards
+    this.server.registerTool(
+      'search_cards',
+      {
+        title: 'Search Cards',
+        description: 'Search for cards across Trello',
+        inputSchema: {
+          query: z.string().describe('Search query text'),
+          boardIds: z.array(z.string()).optional().describe('Limit search to these board IDs'),
+          limit: z.number().optional().default(10).describe('Maximum number of results (default: 10)'),
+        },
+      },
+      async ({ query, boardIds, limit }) => {
+        try {
+          const cards = await this.trelloClient.searchCards(query, boardIds, limit);
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify(cards, null, 2) }],
+          };
+        } catch (error) {
+          return this.handleError(error);
+        }
+      }
+    );
+
     // Attach image to card (kept for backward compatibility)
     this.server.registerTool(
       'attach_image_to_card',

@@ -673,4 +673,32 @@ describe('TrelloClient', () => {
       expect(client.activeBoardId).toBeUndefined();
     });
   });
+
+  describe('searchCards', () => {
+    it('should search cards with query only', async () => {
+      mockAxiosInstance.get.mockResolvedValue({ data: { cards: [{ id: 'c1', name: 'Inbox' }] } });
+      const client = createClient();
+      const result = await client.searchCards('inbox');
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/search', {
+        params: { query: 'inbox', modelTypes: 'cards', cards_limit: 10, card_fields: 'id,name,idShort,idList,idBoard,shortUrl' },
+      });
+      expect(result).toEqual([{ id: 'c1', name: 'Inbox' }]);
+    });
+
+    it('should include idBoards when boardIds provided', async () => {
+      mockAxiosInstance.get.mockResolvedValue({ data: { cards: [] } });
+      const client = createClient();
+      await client.searchCards('inbox', ['board1', 'board2'], 5);
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/search', {
+        params: { query: 'inbox', modelTypes: 'cards', cards_limit: 5, card_fields: 'id,name,idShort,idList,idBoard,shortUrl', idBoards: 'board1,board2' },
+      });
+    });
+
+    it('should return empty array when cards is missing from response', async () => {
+      mockAxiosInstance.get.mockResolvedValue({ data: {} });
+      const client = createClient();
+      const result = await client.searchCards('nothing');
+      expect(result).toEqual([]);
+    });
+  });
 });
