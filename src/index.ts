@@ -256,7 +256,7 @@ class TrelloServer {
         try {
           const card = await this.trelloClient.archiveCard(boardId, cardId);
           return {
-            content: [{ type: 'text' as const, text: JSON.stringify(card, null, 2) }],
+            content: [{ type: 'text' as const, text: JSON.stringify({ id: card.id, closed: true }, null, 2) }],
           };
         } catch (error) {
           return this.handleError(error);
