@@ -216,7 +216,7 @@ class TrelloServer {
         try {
           const card = await this.trelloClient.updateCard(args.boardId, args);
           return {
-            content: [{ type: 'text' as const, text: JSON.stringify(card, null, 2) }],
+            content: [{ type: 'text' as const, text: JSON.stringify({ id: card.id }, null, 2) }],
           };
         } catch (error) {
           return this.handleError(error);
@@ -271,7 +271,7 @@ class TrelloServer {
         try {
           const card = await this.trelloClient.moveCard(boardId, cardId, listId);
           return {
-            content: [{ type: 'text' as const, text: JSON.stringify(card, null, 2) }],
+            content: [{ type: 'text' as const, text: JSON.stringify({ id: card.id, idList: card.idList }, null, 2) }],
           };
         } catch (error) {
           return this.handleError(error);
@@ -769,7 +769,7 @@ class TrelloServer {
         try {
           const comment = await this.trelloClient.addCommentToCard(cardId, text);
           return {
-            content: [{ type: 'text' as const, text: JSON.stringify(comment, null, 2) }],
+            content: [{ type: 'text' as const, text: JSON.stringify({ id: comment.id }, null, 2) }],
           };
         } catch (error) {
           return this.handleError(error);
