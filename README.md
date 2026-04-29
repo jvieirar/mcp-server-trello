@@ -27,14 +27,14 @@ During a 152-comment card migration job the original server was generating 3–5
 
 **For the short ID system** — the prefix registry is managed at runtime. No restart is ever needed.
 
-**Minimal MCP config (no static prefixes):**
+**MCP config (local fork, runs source directly — no build step needed):**
 
 ```json
 {
   "mcpServers": {
     "trello": {
-      "command": "bunx",
-      "args": ["@delorenj/mcp-server-trello"],
+      "command": "bun",
+      "args": ["run", "/Users/juanvieira/development/codebases/tools/mcp-server-trello/src/index.ts"],
       "env": {
         "TRELLO_API_KEY": "your-api-key",
         "TRELLO_TOKEN": "your-token"
@@ -42,6 +42,12 @@ During a 152-comment card migration job the original server was generating 3–5
     }
   }
 }
+```
+
+Or add it via the Claude CLI:
+
+```bash
+claude mcp add --env TRELLO_API_KEY=your-key --env TRELLO_TOKEN=your-token trello -- bun run /Users/juanvieira/development/codebases/tools/mcp-server-trello/src/index.ts
 ```
 
 **Optional: seed prefixes from the env var** (useful for CI/scripted setups):
