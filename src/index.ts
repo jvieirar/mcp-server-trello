@@ -190,8 +190,9 @@ class TrelloServer {
       async args => {
         try {
           const card = await this.trelloClient.addCard(args.boardId, args);
+          const { id, name, shortLink, url, shortId } = card as any;
           return {
-            content: [{ type: 'text' as const, text: JSON.stringify(card, null, 2) }],
+            content: [{ type: 'text' as const, text: JSON.stringify({ id, name, shortLink, url, ...(shortId ? { shortId } : {}) }, null, 2) }],
           };
         } catch (error) {
           return this.handleError(error);
@@ -687,7 +688,7 @@ class TrelloServer {
         try {
           const boards = await this.trelloClient.listBoards();
           return {
-            content: [{ type: 'text' as const, text: JSON.stringify(boards, null, 2) }],
+            content: [{ type: 'text' as const, text: JSON.stringify(boards.map(b => ({ id: b.id, name: b.name, closed: b.closed })), null, 2) }],
           };
         } catch (error) {
           return this.handleError(error);
