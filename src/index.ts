@@ -67,7 +67,7 @@ class TrelloServer {
   private setupTools() {
     // Get cards from a specific list
     this.server.registerTool(
-      'get_cards_by_list_id',
+      'jv_get_cards_by_list_id',
       {
         title: 'Get Cards by List ID',
         description: 'Fetch cards from a specific Trello list on a specific board',
@@ -97,7 +97,7 @@ class TrelloServer {
 
     // Get all lists from a board
     this.server.registerTool(
-      'get_lists',
+      'jv_get_lists',
       {
         title: 'Get Lists',
         description: 'Retrieve all lists from the specified board',
@@ -125,7 +125,7 @@ class TrelloServer {
 
     // Get recent activity
     this.server.registerTool(
-      'get_recent_activity',
+      'jv_get_recent_activity',
       {
         title: 'Get Recent Activity',
         description: 'Fetch recent activity on the Trello board',
@@ -163,7 +163,7 @@ class TrelloServer {
 
     // Add a new card to a list
     this.server.registerTool(
-      'add_card_to_list',
+      'jv_add_card_to_list',
       {
         title: 'Add Card to List',
         description: 'Add a new card to a specified list on a specific board',
@@ -201,7 +201,7 @@ class TrelloServer {
 
     // Update card details
     this.server.registerTool(
-      'update_card_details',
+      'jv_update_card_details',
       {
         title: 'Update Card Details',
         description: "Update an existing card's details on a specific board",
@@ -239,7 +239,7 @@ class TrelloServer {
 
     // Archive a card
     this.server.registerTool(
-      'archive_card',
+      'jv_archive_card',
       {
         title: 'Archive Card',
         description: 'Send a card to the archive on a specific board',
@@ -265,7 +265,7 @@ class TrelloServer {
 
     // Move a card
     this.server.registerTool(
-      'move_card',
+      'jv_move_card',
       {
         title: 'Move Card',
         description: 'Move a card to a different list, potentially on a different board',
@@ -294,7 +294,7 @@ class TrelloServer {
 
     // Add a new list to a board
     this.server.registerTool(
-      'add_list_to_board',
+      'jv_add_list_to_board',
       {
         title: 'Add List to Board',
         description: 'Add a new list to the specified board',
@@ -320,7 +320,7 @@ class TrelloServer {
 
     // Archive a list
     this.server.registerTool(
-      'archive_list',
+      'jv_archive_list',
       {
         title: 'Archive List',
         description: 'Send a list to the archive on a specific board',
@@ -346,7 +346,7 @@ class TrelloServer {
 
     // Update list position
     this.server.registerTool(
-      'update_list_position',
+      'jv_update_list_position',
       {
         title: 'Update List Position',
         description:
@@ -385,7 +385,7 @@ class TrelloServer {
 
     // Get cards assigned to current user
     this.server.registerTool(
-      'get_my_cards',
+      'jv_get_my_cards',
       {
         title: 'Get My Cards',
         description: 'Fetch all cards assigned to the current user',
@@ -412,7 +412,7 @@ class TrelloServer {
 
     // Search for cards
     this.server.registerTool(
-      'search_cards',
+      'jv_search_cards',
       {
         title: 'Search Cards',
         description: 'Search for cards across Trello',
@@ -436,7 +436,7 @@ class TrelloServer {
 
     // Find a card by its short ID (e.g. "JVT-4")
     this.server.registerTool(
-      'find_card_by_short_id',
+      'jv_find_card_by_short_id',
       {
         title: 'Find Card by Short ID',
         description: 'Find a card by its short ID (e.g. "JVT-4")',
@@ -467,7 +467,7 @@ class TrelloServer {
 
     // List all registered board prefixes
     this.server.registerTool(
-      'list_board_prefixes',
+      'jv_list_board_prefixes',
       {
         title: 'List Board Prefixes',
         description: 'List all registered board prefix → boardId mappings. Includes prefixes from BOARD_PREFIXES env var and any registered at runtime.',
@@ -487,7 +487,7 @@ class TrelloServer {
 
     // Register a single board prefix
     this.server.registerTool(
-      'register_board_prefix',
+      'jv_register_board_prefix',
       {
         title: 'Register Board Prefix',
         description: 'Register a board prefix → boardId mapping. Takes effect immediately and persists across server restarts. Use list_boards to find board IDs.',
@@ -510,7 +510,7 @@ class TrelloServer {
 
     // Register multiple board prefixes at once
     this.server.registerTool(
-      'setup_board_prefixes',
+      'jv_setup_board_prefixes',
       {
         title: 'Setup Board Prefixes',
         description: 'Register multiple board prefix → boardId mappings in one call. Takes effect immediately and persists across server restarts. Call list_boards first to get board IDs.',
@@ -540,7 +540,7 @@ class TrelloServer {
 
     // Attach image to card (kept for backward compatibility)
     this.server.registerTool(
-      'attach_image_to_card',
+      'jv_attach_image_to_card',
       {
         title: 'Attach Image to Card',
         description: 'Attach an image to a card from a URL on a specific board',
@@ -579,7 +579,7 @@ class TrelloServer {
 
     // Attach file to card (generic file attachment)
     this.server.registerTool(
-      'attach_file_to_card',
+      'jv_attach_file_to_card',
       {
         title: 'Attach File to Card',
         description: 'Attach any file to a card from a URL on a specific board',
@@ -633,7 +633,7 @@ class TrelloServer {
 
     // Attach image data to card (for base64/data URL uploads)
     this.server.registerTool(
-      'attach_image_data_to_card',
+      'jv_attach_image_data_to_card',
       {
         title: 'Attach Image Data to Card',
         description: 'Attach an image to a card from base64 data or data URL (for screenshot uploads)',
@@ -677,7 +677,7 @@ class TrelloServer {
 
     // List all boards
     this.server.registerTool(
-      'list_boards',
+      'jv_list_boards',
       {
         title: 'List Boards',
         description: 'List all boards the user has access to',
@@ -697,7 +697,7 @@ class TrelloServer {
 
     // Set active board
     this.server.registerTool(
-      'set_active_board',
+      'jv_set_active_board',
       {
         title: 'Set Active Board',
         description: 'Set the active board for future operations',
@@ -724,7 +724,7 @@ class TrelloServer {
 
     // List workspaces
     this.server.registerTool(
-      'list_workspaces',
+      'jv_list_workspaces',
       {
         title: 'List Workspaces',
         description: 'List all workspaces the user has access to',
@@ -744,7 +744,7 @@ class TrelloServer {
 
     // Create a new board
     this.server.registerTool(
-      'create_board',
+      'jv_create_board',
       {
         title: 'Create Board',
         description: 'Create a new Trello board optionally within a workspace',
@@ -788,7 +788,7 @@ class TrelloServer {
 
     // Set active workspace
     this.server.registerTool(
-      'set_active_workspace',
+      'jv_set_active_workspace',
       {
         title: 'Set Active Workspace',
         description: 'Set the active workspace for future operations',
@@ -815,7 +815,7 @@ class TrelloServer {
 
     // List boards in workspace
     this.server.registerTool(
-      'list_boards_in_workspace',
+      'jv_list_boards_in_workspace',
       {
         title: 'List Boards in Workspace',
         description: 'List all boards in a specific workspace',
@@ -837,7 +837,7 @@ class TrelloServer {
 
     // Get active board info
     this.server.registerTool(
-      'get_active_board_info',
+      'jv_get_active_board_info',
       {
         title: 'Get Active Board Info',
         description: 'Get information about the currently active board',
@@ -877,7 +877,7 @@ class TrelloServer {
 
     // Get card details
     this.server.registerTool(
-      'get_card',
+      'jv_get_card',
       {
         title: 'Get Card',
         description: 'Get detailed information about a specific Trello card',
@@ -909,7 +909,7 @@ class TrelloServer {
 
     // Add a comment to a card
     this.server.registerTool(
-      'add_comment',
+      'jv_add_comment',
       {
         title: 'Add Comment to Card',
         description: 'Add the given text as a new comment to the given card',
@@ -932,7 +932,7 @@ class TrelloServer {
 
     // Update a comment to a card
     this.server.registerTool(
-      'update_comment',
+      'jv_update_comment',
       {
         title: 'Update Comment on Card',
         description: 'Update the given comment with the new text',
@@ -955,7 +955,7 @@ class TrelloServer {
 
     // Delete a comment from a card
     this.server.registerTool(
-      'delete_comment',
+      'jv_delete_comment',
       {
         title: 'Delete Comment from Card',
         description: 'Delete a comment from a Trello card',
@@ -977,7 +977,7 @@ class TrelloServer {
 
     // Get comments from a card
     this.server.registerTool(
-      'get_card_comments',
+      'jv_get_card_comments',
       {
         title: 'Get Card Comments',
         description: 'Retrieve all comments from a specific Trello card',
@@ -1004,7 +1004,7 @@ class TrelloServer {
 
     // Checklist tools
     this.server.registerTool(
-      'create_checklist',
+      'jv_create_checklist',
       {
         title: 'Create Checklist',
         description: 'Create a new checklist',
@@ -1027,7 +1027,7 @@ class TrelloServer {
 
     // Checklist tools
     this.server.registerTool(
-      'get_checklist_items',
+      'jv_get_checklist_items',
       {
         title: 'Get Checklist Items',
         description: 'Get all items from a checklist by name',
@@ -1056,7 +1056,7 @@ class TrelloServer {
     );
 
     this.server.registerTool(
-      'add_checklist_item',
+      'jv_add_checklist_item',
       {
         title: 'Add Checklist Item',
         description: 'Add a new item to a checklist',
@@ -1086,7 +1086,7 @@ class TrelloServer {
     );
 
     this.server.registerTool(
-      'find_checklist_items_by_description',
+      'jv_find_checklist_items_by_description',
       {
         title: 'Find Checklist Items by Description',
         description: 'Search for checklist items containing specific text in their description',
@@ -1119,7 +1119,7 @@ class TrelloServer {
     );
 
     this.server.registerTool(
-      'get_acceptance_criteria',
+      'jv_get_acceptance_criteria',
       {
         title: 'Get Acceptance Criteria',
         description: 'Get all items from the "Acceptance Criteria" checklist',
@@ -1147,7 +1147,7 @@ class TrelloServer {
     );
 
     this.server.registerTool(
-      'get_checklist_by_name',
+      'jv_get_checklist_by_name',
       {
         title: 'Get Checklist by Name',
         description: 'Get a complete checklist with all its items and completion percentage',
@@ -1182,7 +1182,7 @@ class TrelloServer {
     );
 
     this.server.registerTool(
-      'update_checklist_item',
+      'jv_update_checklist_item',
       {
         title: 'Update Checklist Item',
         description: 'Update a checklist item name, state, position, due date, reminder, or assigned member',
@@ -1235,7 +1235,7 @@ class TrelloServer {
     );
 
     this.server.registerTool(
-      'delete_checklist_item',
+      'jv_delete_checklist_item',
       {
         title: 'Delete Checklist Item',
         description: 'Delete a checklist item from a card',
@@ -1258,7 +1258,7 @@ class TrelloServer {
 
     // Member management tools
     this.server.registerTool(
-      'get_board_members',
+      'jv_get_board_members',
       {
         title: 'Get Board Members',
         description: 'Get all members of a specific board',
@@ -1282,7 +1282,7 @@ class TrelloServer {
     );
 
     this.server.registerTool(
-      'assign_member_to_card',
+      'jv_assign_member_to_card',
       {
         title: 'Assign Member to Card',
         description: 'Assign a member to a specific card',
@@ -1304,7 +1304,7 @@ class TrelloServer {
     );
 
     this.server.registerTool(
-      'remove_member_from_card',
+      'jv_remove_member_from_card',
       {
         title: 'Remove Member from Card',
         description: 'Remove a member from a specific card',
@@ -1327,7 +1327,7 @@ class TrelloServer {
 
     // Label management tools
     this.server.registerTool(
-      'get_board_labels',
+      'jv_get_board_labels',
       {
         title: 'Get Board Labels',
         description: 'Get all labels of a specific board',
@@ -1351,7 +1351,7 @@ class TrelloServer {
     );
 
     this.server.registerTool(
-      'create_label',
+      'jv_create_label',
       {
         title: 'Create Label',
         description: 'Create a new label on a board',
@@ -1382,7 +1382,7 @@ class TrelloServer {
     );
 
     this.server.registerTool(
-      'update_label',
+      'jv_update_label',
       {
         title: 'Update Label',
         description: 'Update an existing label',
@@ -1405,7 +1405,7 @@ class TrelloServer {
     );
 
     this.server.registerTool(
-      'delete_label',
+      'jv_delete_label',
       {
         title: 'Delete Label',
         description: 'Delete a label from a board',
@@ -1427,7 +1427,7 @@ class TrelloServer {
 
     // Copy a card (supports cross-board copy)
     this.server.registerTool(
-      'copy_card',
+      'jv_copy_card',
       {
         title: 'Copy Card',
         description:
@@ -1478,7 +1478,7 @@ class TrelloServer {
 
     // Copy a checklist from one card to another
     this.server.registerTool(
-      'copy_checklist',
+      'jv_copy_checklist',
       {
         title: 'Copy Checklist',
         description:
@@ -1519,7 +1519,7 @@ class TrelloServer {
 
     // Add multiple cards to a list
     this.server.registerTool(
-      'add_cards_to_list',
+      'jv_add_cards_to_list',
       {
         title: 'Add Cards to List',
         description:
@@ -1567,7 +1567,7 @@ class TrelloServer {
 
     // Card history tool
     this.server.registerTool(
-      'get_card_history',
+      'jv_get_card_history',
       {
         title: 'Get Card History',
         description: 'Get the history/actions of a specific card',
@@ -1599,7 +1599,7 @@ class TrelloServer {
 
     // Download attachment tool
     this.server.registerTool(
-      'download_attachment',
+      'jv_download_attachment',
       {
         title: 'Download Attachment',
         description: 'Download an attachment from a card. Returns base64-encoded data that can be saved or viewed.',
@@ -1651,7 +1651,7 @@ class TrelloServer {
 
   private setupHealthEndpoints() {
     // Basic health check endpoint
-    this.server.registerTool('get_health', HealthEndpointSchemas.basicHealth, async () => {
+    this.server.registerTool('jv_get_health', HealthEndpointSchemas.basicHealth, async () => {
       try {
         return await this.healthEndpoints.getBasicHealth();
       } catch (error) {
@@ -1661,7 +1661,7 @@ class TrelloServer {
 
     // Detailed health diagnostic endpoint
     this.server.registerTool(
-      'get_health_detailed',
+      'jv_get_health_detailed',
       HealthEndpointSchemas.detailedHealth,
       async () => {
         try {
@@ -1674,7 +1674,7 @@ class TrelloServer {
 
     // Metadata consistency check endpoint
     this.server.registerTool(
-      'get_health_metadata',
+      'jv_get_health_metadata',
       HealthEndpointSchemas.metadataHealth,
       async () => {
         try {
@@ -1687,7 +1687,7 @@ class TrelloServer {
 
     // Performance metrics endpoint
     this.server.registerTool(
-      'get_health_performance',
+      'jv_get_health_performance',
       HealthEndpointSchemas.performanceHealth,
       async () => {
         try {
@@ -1699,7 +1699,7 @@ class TrelloServer {
     );
 
     // System repair endpoint
-    this.server.registerTool('perform_system_repair', HealthEndpointSchemas.repair, async () => {
+    this.server.registerTool('jv_perform_system_repair', HealthEndpointSchemas.repair, async () => {
       try {
         return await this.healthEndpoints.performRepair();
       } catch (error) {

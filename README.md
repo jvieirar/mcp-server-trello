@@ -10,13 +10,13 @@ During a 152-comment card migration job the original server was generating 3–5
 
 | Change | Before | After | Why |
 |--------|--------|-------|-----|
-| `add_comment` response | Full Trello action object (~4 KB) | `{ id }` | Agent only needs confirmation |
-| `move_card` response | Full card object | `{ id, idList }` | Agent only needs the new location |
-| `update_card_details` response | Full card object | `{ id }` | Agent only needs confirmation |
-| `get_my_cards` | All fields, all statuses | Slim fields, open cards only (configurable) | Dramatically smaller list responses |
-| `get_lists` | All list fields | `id, name` only (configurable) | Agents almost never need more |
-| `get_card` | Always fetches everything | `lightweight` param for slim lookups | Full mode still available when needed |
-| `search_cards` | Did not exist | New tool hitting `/search` directly | Find cards without fetching an entire list |
+| `jv_add_comment` response | Full Trello action object (~4 KB) | `{ id }` | Agent only needs confirmation |
+| `jv_move_card` response | Full card object | `{ id, idList }` | Agent only needs the new location |
+| `jv_update_card_details` response | Full card object | `{ id }` | Agent only needs confirmation |
+| `jv_get_my_cards` | All fields, all statuses | Slim fields, open cards only (configurable) | Dramatically smaller list responses |
+| `jv_get_lists` | All list fields | `id, name` only (configurable) | Agents almost never need more |
+| `jv_get_card` | Always fetches everything | `lightweight` param for slim lookups | Full mode still available when needed |
+| `jv_search_cards` | Did not exist | New tool hitting `/search` directly | Find cards without fetching an entire list |
 | Short ID system | Did not exist | `[PREFIX-N]` suffix on card names + resolver | Human-readable card references across sessions |
 
 ### Setup and prerequisites
@@ -32,7 +32,7 @@ During a 152-comment card migration job the original server was generating 3–5
 ```json
 {
   "mcpServers": {
-    "trello": {
+    "trello-jv": {
       "command": "bun",
       "args": ["run", "/Users/juanvieira/development/codebases/tools/mcp-server-trello/src/index.ts"],
       "env": {
@@ -47,7 +47,7 @@ During a 152-comment card migration job the original server was generating 3–5
 Or add it via the Claude CLI:
 
 ```bash
-claude mcp add --env TRELLO_API_KEY=your-key --env TRELLO_TOKEN=your-token trello -- bun run /Users/juanvieira/development/codebases/tools/mcp-server-trello/src/index.ts
+claude mcp add --env TRELLO_API_KEY=your-key --env TRELLO_TOKEN=your-token trello-jv -- bun run /Users/juanvieira/development/codebases/tools/mcp-server-trello/src/index.ts
 ```
 
 **Optional: seed prefixes from the env var** (useful for CI/scripted setups):
@@ -61,12 +61,12 @@ Env var values are merged with the persisted registry at startup. Env wins on co
 **First-time setup with the agent (recommended):**
 
 ```
-1. list_boards                         → see all board IDs
-2. setup_board_prefixes(mappings)      → register all prefixes in one call
-3. list_board_prefixes                 → confirm
+1. jv_list_boards                         → see all board IDs
+2. jv_setup_board_prefixes(mappings)      → register all prefixes in one call
+3. jv_list_board_prefixes                 → confirm
 ```
 
-Registered prefixes are written to `~/.trello-mcp/config.json` and survive restarts. Adding a new board later requires only one `register_board_prefix` call — no config file edit, no restart.
+Registered prefixes are written to `~/.trello-mcp/config.json` and survive restarts. Adding a new board later requires only one `jv_register_board_prefix` call — no config file edit, no restart.
 
 ### Agent skill
 
@@ -76,22 +76,22 @@ A Claude Code agent skill is included at [`skills/trello-mcp-agent.md`](skills/t
 
 ```json
 // Lightweight card lookup (no comments/checklists — ~90% smaller)
-{ "name": "get_card", "arguments": { "cardId": "abc123", "lightweight": true } }
+{ "name": "jv_get_card", "arguments": { "cardId": "abc123", "lightweight": true } }
 
 // Search without fetching a list
-{ "name": "search_cards", "arguments": { "query": "fix auth bug", "limit": 5 } }
+{ "name": "jv_search_cards", "arguments": { "query": "fix auth bug", "limit": 5 } }
 
 // Register prefix for a new board — takes effect immediately, persists
-{ "name": "register_board_prefix", "arguments": { "prefix": "PROJ", "boardId": "boardId3" } }
+{ "name": "jv_register_board_prefix", "arguments": { "prefix": "PROJ", "boardId": "boardId3" } }
 
 // Create a card with a short ID (name becomes "Fix auth bug [JVT-42]")
-{ "name": "add_card_to_list", "arguments": { "listId": "list-id", "name": "Fix auth bug", "boardPrefix": "JVT" } }
+{ "name": "jv_add_card_to_list", "arguments": { "listId": "list-id", "name": "Fix auth bug", "boardPrefix": "JVT" } }
 
 // Resolve a short ID to a card (boardId auto-resolved from registry)
-{ "name": "find_card_by_short_id", "arguments": { "shortId": "JVT-42" } }
+{ "name": "jv_find_card_by_short_id", "arguments": { "shortId": "JVT-42" } }
 
 // Slim open cards assigned to me
-{ "name": "get_my_cards", "arguments": { "filter": "open", "fields": "name,idShort,idList,labels,due" } }
+{ "name": "jv_get_my_cards", "arguments": { "filter": "open", "fields": "name,idShort,idList,labels,due" } }
 ```
 
 ---
