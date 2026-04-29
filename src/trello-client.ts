@@ -4,6 +4,7 @@ import FormData from 'form-data';
 import {
   TrelloConfig,
   TrelloCard,
+  TrelloCardSearchResult,
   TrelloList,
   TrelloAction,
   TrelloAttachment,
@@ -1237,7 +1238,7 @@ export class TrelloClient {
   /**
    * Search for cards across Trello
    */
-  async searchCards(query: string, boardIds?: string[], limit = 10): Promise<TrelloCard[]> {
+  async searchCards(query: string, boardIds?: string[], limit = 10): Promise<TrelloCardSearchResult[]> {
     return this.handleRequest(async () => {
       const params: Record<string, string | number> = {
         query,

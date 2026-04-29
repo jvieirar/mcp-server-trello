@@ -37,6 +37,15 @@ export interface TrelloCard {
   dateLastActivity: string;
 }
 
+export interface TrelloCardSearchResult {
+  id: string;
+  name: string;
+  idShort: number;
+  idList: string;
+  idBoard: string;
+  shortUrl: string;
+}
+
 export interface TrelloList {
   id: string;
   name: string;
