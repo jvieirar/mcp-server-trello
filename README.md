@@ -75,15 +75,38 @@ claude mcp add --env TRELLO_API_KEY=your-key --env TRELLO_TOKEN=your-token trell
 
 Env var values are merged with the persisted registry at startup. Env wins on conflict.
 
-**First-time setup with the agent (recommended):**
+### After installation — board prefix setup
 
-```
-1. jv_list_boards                         → see all board IDs
-2. jv_setup_board_prefixes(mappings)      → register all prefixes in one call
-3. jv_list_board_prefixes                 → confirm
+Once the MCP server is connected, run these three tool calls in Claude to map your boards to short prefixes:
+
+**Step 1 — List your boards to get their IDs:**
+```json
+{ "name": "jv_list_boards", "arguments": {} }
 ```
 
-Registered prefixes are written to `~/.trello-mcp/config.json` and survive restarts. Adding a new board later requires only one `jv_register_board_prefix` call — no config file edit, no restart.
+**Step 2 — Register your chosen prefixes:**
+```json
+{
+  "name": "jv_setup_board_prefixes",
+  "arguments": {
+    "mappings": [
+      { "prefix": "JVT",  "boardId": "<id from step 1>" },
+      { "prefix": "TATA", "boardId": "<id from step 1>" }
+    ]
+  }
+}
+```
+
+**Step 3 — Confirm the registry:**
+```json
+{ "name": "jv_list_board_prefixes", "arguments": {} }
+```
+
+Registered prefixes are written to `~/.trello-mcp/config.json` and survive restarts. To add a new board later, one call is enough — no config file edit, no restart:
+
+```json
+{ "name": "jv_register_board_prefix", "arguments": { "prefix": "PROJ", "boardId": "your-board-id" } }
+```
 
 ### Agent skill
 
