@@ -271,7 +271,7 @@ export class TrelloClient {
     });
   }
 
-  async getLists(boardId?: string): Promise<TrelloList[]> {
+  async getLists(boardId?: string, fields = 'id,name'): Promise<TrelloList[]> {
     const effectiveBoardId = boardId || this.activeConfig.boardId || this.defaultBoardId;
     if (!effectiveBoardId) {
       throw new McpError(
@@ -280,7 +280,9 @@ export class TrelloClient {
       );
     }
     return this.handleRequest(async () => {
-      const response = await this.axiosInstance.get(`/boards/${effectiveBoardId}/lists`);
+      const response = await this.axiosInstance.get(`/boards/${effectiveBoardId}/lists`, {
+        params: { fields },
+      });
       return response.data;
     });
   }

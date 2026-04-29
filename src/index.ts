@@ -97,11 +97,14 @@ class TrelloServer {
             .string()
             .optional()
             .describe('ID of the Trello board (uses default if not provided)'),
+          fields: z.string().optional().describe(
+            'Comma-separated fields to return (default: id,name)'
+          ),
         },
       },
-      async ({ boardId }) => {
+      async ({ boardId, fields }) => {
         try {
-          const lists = await this.trelloClient.getLists(boardId);
+          const lists = await this.trelloClient.getLists(boardId, fields);
           return {
             content: [{ type: 'text' as const, text: JSON.stringify(lists, null, 2) }],
           };

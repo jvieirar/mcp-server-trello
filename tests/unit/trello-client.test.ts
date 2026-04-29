@@ -102,7 +102,9 @@ describe('TrelloClient', () => {
       const client = createClient();
       const result = await client.getLists('board123');
 
-      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/boards/board123/lists');
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/boards/board123/lists', {
+        params: { fields: 'id,name' },
+      });
       expect(result).toEqual(lists);
     });
 
@@ -112,7 +114,9 @@ describe('TrelloClient', () => {
       const client = createClient({ boardId: 'active-board' });
       await client.getLists();
 
-      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/boards/active-board/lists');
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/boards/active-board/lists', {
+        params: { fields: 'id,name' },
+      });
     });
 
     it('should throw when no board ID available', async () => {
@@ -120,6 +124,24 @@ describe('TrelloClient', () => {
       await expect(client.getLists()).rejects.toThrow(
         'boardId is required when no default board is configured'
       );
+    });
+
+    it('should default to fields=id,name', async () => {
+      mockAxiosInstance.get.mockResolvedValueOnce({ data: [] });
+      const client = createClient({ boardId: 'board1' });
+      await client.getLists();
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/boards/board1/lists', {
+        params: { fields: 'id,name' },
+      });
+    });
+
+    it('should pass explicit fields when provided', async () => {
+      mockAxiosInstance.get.mockResolvedValueOnce({ data: [] });
+      const client = createClient({ boardId: 'board1' });
+      await client.getLists('board1', 'id,name,closed');
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/boards/board1/lists', {
+        params: { fields: 'id,name,closed' },
+      });
     });
   });
 
