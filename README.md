@@ -127,25 +127,161 @@ Registered prefixes are written to `~/.trello-mcp/config.json` and survive resta
 
 ### Agent skill
 
-A Claude Code agent skill is included at [`skills/trello-mcp-agent.md`](skills/trello-mcp-agent.md). Load it to get tool-selection guidance, the full short ID setup flow, and efficient workflow recipes.
+A Claude Code agent skill is included at [`skills/jv-trello/SKILL.md`](skills/jv-trello/SKILL.md). When active, it governs the agent's full workflow: how it reads board configuration, sets up worktrees, selects tools, and leaves structured comments on cards.
 
-**Quick usage examples:**
+Install the skill once:
+
+```bash
+mkdir -p ~/.claude/skills/jv-trello
+cp skills/jv-trello/SKILL.md ~/.claude/skills/jv-trello/SKILL.md
+```
+
+---
+
+### How the agent works
+
+#### Agent state machine
+
+```mermaid
+stateDiagram-v2
+    [*] --> Setup
+    Setup --> Discovery : board config parsed
+    Discovery --> Planning : cards / lists fetched
+    Planning --> Mutation : [PLAN] comment posted on card
+    Mutation --> Mutation : more mutations remain
+    Mutation --> Done : all mutations complete
+    Done --> [*]
+
+    Setup : Read jv_get_active_board_info\nParse board desc config\nSet up worktree if needed
+    Discovery : jv_search_cards / jv_get_lists\njv_find_card_by_short_id
+    Planning : Decide steps\nPost [PLAN] comment
+    Mutation : jv_move_card / jv_add_comment\njv_archive_card / jv_update_card_details
+    Done : Post [RESULT] / [NOTE]\nCommit if autoCommit = true
+```
+
+#### Board config (in the board's Description field)
+
+The agent reads the board's `desc` field at session start and applies the config it finds there. Add this JSON block to the **Description** field of your Trello board to configure behaviour:
+
+```js
+{
+  worktrees: {
+    create: 'always',   // 'always' | 'ask' | 'never'
+    path: '.worktrees',
+    format: `${path}/${featureName}`,
+    branchFormat: `feature/${featureName}`
+  },
+  autoCommit: false,
+  createPr: false
+}
+```
+
+If no config is found the agent defaults to `create: 'ask'`, `autoCommit: false`, `createPr: false`.
+
+**Worktree decision:**
+
+```mermaid
+flowchart TD
+    A[Read board desc] --> B{Config present?}
+    B -- no --> C[Default: ask user]
+    B -- yes --> D{worktrees.create}
+    D -- always --> E[git worktree add\n.worktrees/featureName\n-b feature/featureName]
+    D -- ask --> F[Ask user before creating]
+    D -- never --> G[Work in current branch]
+    C --> F
+```
+
+One session = one worktree. Subagents always inherit the parent's `cwd` and never create their own.
+
+#### Comment discipline
+
+The agent leaves structured comments on cards throughout its work. Every comment is prefixed with a type tag so you always know what the agent is doing and why.
+
+| Tag | When the agent posts it |
+|---|---|
+| `[PLAN]` | Before starting — the steps it will take and what it is explicitly not doing |
+| `[DECISION]` | At the moment it makes a non-trivial judgment call |
+| `[RESULT]` | After finishing — what changed, what files were touched, any follow-ups |
+| `[NOTE]` | Context that isn't a plan or result: worktree path, session info, admin notes |
+| `[QUESTION]` | When it needs user input to continue |
+
+Example `[RESULT]` comment on a card:
+
+```
+[RESULT]
+## Changes
+- Moved card from "In Progress" to "Done"
+- Added label "REVIEWED"
+## Follow-ups
+- PR link once branch is pushed
+```
+
+#### Mutation response shapes
+
+Every mutation tool returns a minimal confirmation — the agent never reads card state back from a mutation response. If it needs the updated card, it calls `jv_get_card` separately.
+
+| Tool | Returns |
+|---|---|
+| `jv_add_comment` | `{ id }` |
+| `jv_move_card` | `{ id, idList }` |
+| `jv_update_card_details` | `{ id }` |
+| `jv_archive_card` | `{ id, closed: true }` |
+| `jv_add_card_to_list` | `{ id, name, shortLink, url, shortId? }` |
+| `jv_list_boards` | `[{ id, name, closed }]` |
+| `jv_get_lists` | `[{ id, name }]` by default |
+
+#### Tool ordering rules
+
+```mermaid
+flowchart LR
+    A[User intent] --> B{Creating?}
+    B -- yes --> C[jv_search_cards\ncheck duplicates]
+    C --> D[jv_add_card_to_list]
+    B -- no --> E{Moving?}
+    E -- yes --> F[jv_find_card_by_short_id\nor jv_search_cards]
+    F --> G[jv_get_lists]
+    G --> H[jv_move_card]
+    E -- no --> I{Archiving?}
+    I -- yes --> J[jv_find_card_by_short_id]
+    J --> K[jv_archive_card]
+```
+
+#### Suggested labels for efficient search
+
+The agent can search cards by label using `jv_search_cards` with a `label:` query. Consistent label names let you build workflows the agent can act on without manual triage. Suggested label set:
+
+| Label | Meaning |
+|---|---|
+| `AI_READY` | Card has enough context for an agent to act on it without asking questions |
+| `NEEDS_CONTEXT` | Card is blocked until a human adds more information |
+| `IN_REVIEW` | Card is waiting for human review before the agent continues |
+| `BLOCKED` | Hard external blocker — third party, missing credential, infra issue |
+| `RECURRING` | Card represents a repeating task |
+
+Search example — find everything ready for the agent to work on:
 
 ```json
-// Lightweight card lookup (no comments/checklists — ~90% smaller)
-{ "name": "jv_get_card", "arguments": { "cardId": "abc123", "lightweight": true } }
+{ "name": "jv_search_cards", "arguments": { "query": "label:AI_READY", "boardIds": ["your-board-id"], "limit": 20 } }
+```
 
-// Search without fetching a list
-{ "name": "jv_search_cards", "arguments": { "query": "fix auth bug", "limit": 5 } }
+#### Short ID system
 
-// Register prefix for a new board — takes effect immediately, persists
-{ "name": "jv_register_board_prefix", "arguments": { "prefix": "PROJ", "boardId": "boardId3" } }
+Cards can be given human-readable IDs like `JVT-4` at creation time. The ID is appended to the card name as `[JVT-4]` and is searchable. See [After installation — board prefix setup](#after-installation--board-prefix-setup) for the first-time setup flow.
 
+Quick reference:
+
+```json
 // Create a card with a short ID (name becomes "Fix auth bug [JVT-42]")
 { "name": "jv_add_card_to_list", "arguments": { "listId": "list-id", "name": "Fix auth bug", "boardPrefix": "JVT" } }
 
 // Resolve a short ID to a card (boardId auto-resolved from registry)
 { "name": "jv_find_card_by_short_id", "arguments": { "shortId": "JVT-42" } }
+
+// Search by label
+{ "name": "jv_search_cards", "arguments": { "query": "label:AI_READY", "limit": 20 } }
+
+// Lightweight card lookup (no comments/checklists — ~90% smaller payload)
+{ "name": "jv_get_card", "arguments": { "cardId": "abc123", "lightweight": true } }
 
 // Slim open cards assigned to me
 { "name": "jv_get_my_cards", "arguments": { "filter": "open", "fields": "name,idShort,idList,labels,due" } }
