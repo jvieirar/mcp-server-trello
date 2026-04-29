@@ -25,15 +25,9 @@ During a 152-comment card migration job the original server was generating 3–5
 - [Bun](https://bun.sh) v1.0+
 - A Trello API key and token (see [Configuration](#configuration))
 
-**For the short ID system** — set `BOARD_PREFIXES` in your MCP server env:
+**For the short ID system** — the prefix registry is managed at runtime. No restart is ever needed.
 
-```
-BOARD_PREFIXES=JVT:boardId1,TATA:boardId2
-```
-
-Format: `PREFIX:trelloBoardId` pairs separated by commas. The prefix becomes the human-readable namespace (e.g. `JVT-4`). Get board IDs from `list_boards`.
-
-**Full MCP config with all options:**
+**Minimal MCP config (no static prefixes):**
 
 ```json
 {
@@ -43,18 +37,34 @@ Format: `PREFIX:trelloBoardId` pairs separated by commas. The prefix becomes the
       "args": ["@delorenj/mcp-server-trello"],
       "env": {
         "TRELLO_API_KEY": "your-api-key",
-        "TRELLO_TOKEN": "your-token",
-        "TRELLO_BOARD_ID": "optional-default-board-id",
-        "BOARD_PREFIXES": "JVT:boardId1,TATA:boardId2"
+        "TRELLO_TOKEN": "your-token"
       }
     }
   }
 }
 ```
 
+**Optional: seed prefixes from the env var** (useful for CI/scripted setups):
+
+```json
+"BOARD_PREFIXES": "JVT:boardId1,TATA:boardId2"
+```
+
+Env var values are merged with the persisted registry at startup. Env wins on conflict.
+
+**First-time setup with the agent (recommended):**
+
+```
+1. list_boards                         → see all board IDs
+2. setup_board_prefixes(mappings)      → register all prefixes in one call
+3. list_board_prefixes                 → confirm
+```
+
+Registered prefixes are written to `~/.trello-mcp/config.json` and survive restarts. Adding a new board later requires only one `register_board_prefix` call — no config file edit, no restart.
+
 ### Agent skill
 
-A Claude Code agent skill is included at [`skills/trello-mcp-agent.md`](skills/trello-mcp-agent.md). Load it to get tool-selection guidance, short ID patterns, and efficient workflow recipes.
+A Claude Code agent skill is included at [`skills/trello-mcp-agent.md`](skills/trello-mcp-agent.md). Load it to get tool-selection guidance, the full short ID setup flow, and efficient workflow recipes.
 
 **Quick usage examples:**
 
@@ -65,10 +75,13 @@ A Claude Code agent skill is included at [`skills/trello-mcp-agent.md`](skills/t
 // Search without fetching a list
 { "name": "search_cards", "arguments": { "query": "fix auth bug", "limit": 5 } }
 
+// Register prefix for a new board — takes effect immediately, persists
+{ "name": "register_board_prefix", "arguments": { "prefix": "PROJ", "boardId": "boardId3" } }
+
 // Create a card with a short ID (name becomes "Fix auth bug [JVT-42]")
 { "name": "add_card_to_list", "arguments": { "listId": "list-id", "name": "Fix auth bug", "boardPrefix": "JVT" } }
 
-// Resolve a short ID to a card
+// Resolve a short ID to a card (boardId auto-resolved from registry)
 { "name": "find_card_by_short_id", "arguments": { "shortId": "JVT-42" } }
 
 // Slim open cards assigned to me

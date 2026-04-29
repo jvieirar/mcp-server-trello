@@ -34,17 +34,62 @@ Don't try to read updated card state from mutation responses — call `get_card`
 
 ## Short ID system
 
-Cards can be given human-readable IDs like `JVT-4` at creation time. These are appended to the card name as `[JVT-4]` and searchable.
+Cards can be given human-readable IDs like `JVT-4` at creation time. These are appended to the card name as `[JVT-4]` and are searchable.
 
-### Prerequisites
+### How the prefix registry works
 
-Set the `BOARD_PREFIXES` env var in your MCP server config. Format:
+The server maintains a `prefix → boardId` map in memory, persisted to `~/.trello-mcp/config.json`. It merges two sources at startup:
+
+1. **`BOARD_PREFIXES` env var** (optional, for static bootstrap) — set once in your MCP JSON config
+2. **Persisted registry** — written to disk whenever you call `register_board_prefix` or `setup_board_prefixes`
+
+Env var values take precedence over the persisted file on conflict. Registered values survive restarts. **No server restart is needed** when you register a new prefix via a tool call — it takes effect immediately.
+
+### First-time setup (recommended flow)
 
 ```
-BOARD_PREFIXES=JVT:boardId1,TATA:boardId2
+1. list_boards                    → get all board IDs + names
+2. setup_board_prefixes(mappings) → register chosen prefix for each board
+3. list_board_prefixes            → confirm the registry
 ```
 
-`boardId` is the Trello board ID (e.g. from `list_boards`). `JVT` is the prefix you choose for that board.
+Example `setup_board_prefixes` call:
+
+```json
+{
+  "name": "setup_board_prefixes",
+  "arguments": {
+    "mappings": [
+      { "prefix": "JVT", "boardId": "boardId1" },
+      { "prefix": "TATA", "boardId": "boardId2" }
+    ]
+  }
+}
+```
+
+Prefixes are always stored as uppercase (`jvt` → `JVT`).
+
+### Adding a new board later
+
+```json
+{
+  "name": "register_board_prefix",
+  "arguments": {
+    "prefix": "PROJ",
+    "boardId": "boardId3"
+  }
+}
+```
+
+Takes effect immediately. No restart required.
+
+### Checking current registry
+
+```json
+{ "name": "list_board_prefixes", "arguments": {} }
+```
+
+Returns the full current map (env + persisted).
 
 ### Creating a card with a short ID
 
@@ -59,7 +104,7 @@ BOARD_PREFIXES=JVT:boardId1,TATA:boardId2
 }
 ```
 
-Response includes `shortId: "JVT-42"` and the card name becomes `"Fix auth bug [JVT-42]"`.
+Response includes `shortId: "JVT-42"` and the card name becomes `"Fix auth bug [JVT-42]"`. The prefix does **not** need to be in the registry for card creation — it's used as-is. The registry is only needed for `find_card_by_short_id` auto-resolve.
 
 ### Resolving a short ID
 
@@ -72,7 +117,7 @@ Response includes `shortId: "JVT-42"` and the card name becomes `"Fix auth bug [
 }
 ```
 
-If `BOARD_PREFIXES` is configured, `boardId` is auto-resolved from the prefix — you don't need to pass it.
+`boardId` is auto-resolved from the registry by extracting the prefix (`JVT` from `JVT-42`). If the prefix isn't registered, the search falls back to all boards — slower but still works.
 
 ### Manual boardId override
 
