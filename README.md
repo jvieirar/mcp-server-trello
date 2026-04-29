@@ -131,9 +131,12 @@ A Claude Code agent skill is included at [`skills/jv-trello/SKILL.md`](skills/jv
 
 Install the skill once:
 
-```bash
-mkdir -p ~/.claude/skills/jv-trello
-cp skills/jv-trello/SKILL.md ~/.claude/skills/jv-trello/SKILL.md
+```sh
+# Claude Code
+cp -r ./skills/jv-trello ~/.claude/skills/
+
+# Other agents (generic path)
+cp -r ./skills/jv-trello ~/.agents/skills/
 ```
 
 ---
