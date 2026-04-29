@@ -411,7 +411,10 @@ export class TrelloClient {
     });
   }
 
-  async getMyCards(fields?: string, filter = 'open'): Promise<TrelloCard[]> {
+  async getMyCards(
+    fields = 'name,idShort,idBoard,idList,labels,due,dueComplete',
+    filter = 'open'
+  ): Promise<TrelloCard[]> {
     return this.handleRequest(async () => {
       const params: Record<string, string> = { filter };
       if (fields) params.fields = fields;

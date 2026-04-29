@@ -380,14 +380,14 @@ class TrelloServer {
           fields: z.string().optional().describe(
             'Comma-separated card fields to return (default: name,idShort,idBoard,idList,labels,due,dueComplete)'
           ),
-          filter: z.string().optional().describe('Card filter: open (default), closed, or all'),
+          filter: z.enum(['open', 'closed', 'all', 'visible', 'none']).optional().describe(
+            'Card filter: open (default), closed, all, visible, or none'
+          ),
         },
       },
       async ({ fields, filter }) => {
         try {
-          const effectiveFields = fields ?? 'name,idShort,idBoard,idList,labels,due,dueComplete';
-          const effectiveFilter = filter ?? 'open';
-          const cards = await this.trelloClient.getMyCards(effectiveFields, effectiveFilter);
+          const cards = await this.trelloClient.getMyCards(fields, filter);
           return {
             content: [{ type: 'text' as const, text: JSON.stringify(cards, null, 2) }],
           };

@@ -255,23 +255,14 @@ describe('TrelloClient', () => {
   });
 
   describe('getMyCards', () => {
-    it('should fetch current user cards', async () => {
+    it('should include default fields and filter=open when called with no arguments', async () => {
       mockAxiosInstance.get.mockResolvedValue({ data: [] });
 
       const client = createClient();
       await client.getMyCards();
 
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/members/me/cards', {
-        params: { filter: 'open' },
-      });
-    });
-
-    it('should pass filter=open and default fields by default', async () => {
-      mockAxiosInstance.get.mockResolvedValueOnce({ data: [] });
-      const client = createClient();
-      await client.getMyCards();
-      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/members/me/cards', {
-        params: { filter: 'open' },
+        params: { filter: 'open', fields: 'name,idShort,idBoard,idList,labels,due,dueComplete' },
       });
     });
 
