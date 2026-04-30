@@ -4,6 +4,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { TrelloClient } from './trello-client.js';
 import { TrelloHealthEndpoints, HealthEndpointSchemas } from './health/health-endpoints.js';
+import { startWebhookServer } from './webhook.js';
 
 class TrelloServer {
   private server: McpServer;
@@ -1711,10 +1712,8 @@ class TrelloServer {
 
   async run() {
     const transport = new StdioServerTransport();
-    // Load configuration before starting the server
-    await this.trelloClient.loadConfig().catch(() => {
-      // Continue with default config if loading fails
-    });
+    await this.trelloClient.loadConfig().catch(() => {});
+    startWebhookServer();
     await this.server.connect(transport);
   }
 }
