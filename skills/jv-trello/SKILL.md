@@ -224,7 +224,7 @@ Every mutation returns a minimal confirmation. Never read card state from a muta
 
 ## Tool ordering rules
 
-- **Before creating:** always `jv_search_cards` first to check for duplicates
+- **Before creating:** run `jv_search_cards` (board-scoped, limit 10) as a light sanity check for duplicate names. This is best-effort — Trello's search API cannot filter by list, and the short ID (`JVT-N`) is the real uniqueness guarantee for agent-created cards. If results are returned, flag them to the user before proceeding; don't block creation automatically.
 - **Every card creation:** always pass `boardPrefix` — **creating a card without a short ID is an error**
 - **Before moving or archiving:** always resolve the card (`jv_find_card_by_short_id` or `jv_search_cards`) first
 - **Before moving:** always `jv_get_lists` to get the target list ID unless already cached this session
