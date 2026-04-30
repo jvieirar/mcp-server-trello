@@ -50,17 +50,49 @@ git worktree add .worktrees/<featureName> -b feature/<featureName>
 
 **One session = one worktree.** Subagents never create new worktrees — they inherit the parent's `cwd`.
 
-### 3 — Cache board labels
+### 3 — Initialise lifecycle labels
 
-Immediately after reading board config, fetch the board's labels and build a name→ID map:
+Fetch the board's labels and build a name→ID map:
 
 ```json
 { "name": "jv_get_board_labels", "arguments": {} }
 ```
 
-Store the result as `labelMap: Record<string, string>` (label name → label ID). You will use this map throughout the session to apply and remove labels without extra lookups.
+Check that all four lifecycle labels exist: `AI_READY`, `AI_WORKING`, `IN_REVIEW`, `BLOCKED`. For any that are missing, create them now using the default colors below:
 
-### 4 — Auto-commit and PR
+| Label | Color |
+|---|---|
+| `AI_READY` | `lime` |
+| `AI_WORKING` | `sky` |
+| `IN_REVIEW` | `orange` |
+| `BLOCKED` | `red` |
+
+```json
+{ "name": "jv_create_label", "arguments": { "name": "AI_WORKING", "color": "sky" } }
+```
+
+After creating, re-fetch labels and rebuild the map so all IDs are current. Store as `labelMap: Record<string, string>` (label name → label ID) for use throughout the session.
+
+### 4 — Cache mandatory columns
+
+Call `jv_get_lists` and find the four mandatory columns by name (case-insensitive match):
+
+```json
+{ "name": "jv_get_lists", "arguments": {} }
+```
+
+Build a `listMap`:
+
+| Key | Trello list name |
+|---|---|
+| `backlog` | Backlog |
+| `inProgress` | In Progress |
+| `blocked` | Blocked |
+| `done` | Done |
+
+If any mandatory list is missing, post a `[NOTE]` warning on the first card you work on and skip that column move silently. Never create lists automatically. Use other available columns (e.g. "Todo", "In Review") only when the user explicitly asks.
+
+### 5 — Auto-commit and PR
 
 | Flag | Behaviour |
 |---|---|
@@ -113,25 +145,39 @@ Format:
 
 ---
 
-## Label lifecycle
+## Card lifecycle
 
-Use the `labelMap` cached during session setup to apply and remove labels via `jv_update_card_details`. Pass the full intended label ID array — Trello replaces, not appends.
+Every lifecycle event updates **both** the column and labels in one step. Use `listMap` (from session setup step 4) for column moves and `labelMap` (step 3) for label updates.
 
-| Event | Remove | Add |
-|---|---|---|
-| Agent picks up card | `AI_READY` | `AI_WORKING` |
-| Agent posts `[PLAN]` | — | — |
-| Agent finishes | `AI_WORKING` | `IN_REVIEW` |
-| Agent blocked | — | `BLOCKED` |
-| Agent unblocked / resumes | `BLOCKED`, `IN_REVIEW` | `AI_WORKING` |
+| Event | Column | Label: Remove | Label: Add |
+|---|---|---|---|
+| Agent picks up card | → `inProgress` | `AI_READY` | `AI_WORKING` |
+| Agent posts `[PLAN]` | — | — | — |
+| Agent finishes | → `done` | `AI_WORKING` | `IN_REVIEW` |
+| Agent blocked | → `blocked` | — | `BLOCKED` |
+| Agent unblocked / resumes | → `inProgress` | `BLOCKED`, `IN_REVIEW` | `AI_WORKING` |
+| Human approves (review handoff) | — | `IN_REVIEW` | — |
 
-**How to update labels:**
+The card ends in the `done` column with no lifecycle labels. `IN_REVIEW` signals that the agent finished but the human hasn't verified yet — the column is already Done.
 
-1. Read current label IDs from `jv_get_card` (lightweight) — field `labels[].id`
-2. Compute new set: remove outgoing IDs, add incoming IDs from `labelMap`
-3. Call `jv_update_card_details` with `labels: [newId1, newId2, ...]`
+Only use columns outside the mandatory four (`Backlog`, `In Progress`, `Blocked`, `Done`) when the user explicitly requests it.
 
-If a label name isn't in `labelMap` (not created on the board yet), skip that label silently — never error.
+**How to execute a lifecycle step:**
+
+1. `jv_get_card` (lightweight) → current `labels[].id` + current `idList`
+2. Compute new label set: remove outgoing IDs, add incoming IDs from `labelMap`
+3. `jv_move_card(cardId, listMap.targetColumn)` — if column changes
+4. `jv_update_card_details(cardId, { labels: [...] })` — if labels change
+
+### Review handoff (human-triggered)
+
+When the user says something like "reviewed", "approved", "looks good", or "I've reviewed it":
+
+1. Remove `IN_REVIEW` label from the card (card stays in `done`)
+2. Post `[NOTE] Review approved. Cleaning up worktree.` on the card
+3. Remove the worktree: `git worktree remove .worktrees/<featureName>`
+
+Do **not** remove the worktree at any other point — always wait for the review handoff signal.
 
 ---
 

@@ -261,25 +261,39 @@ flowchart LR
 
 #### Labels — lifecycle and search
 
-The agent manages four labels automatically as it works. Create these on your board and the agent will apply and remove them at the right moments:
+The agent manages four labels automatically. **You don't need to create them manually** — the agent creates any missing lifecycle labels during session setup.
 
-| Label | Set by | Meaning |
-|---|---|---|
-| `AI_READY` | Human | Card has enough context for the agent to act without asking questions |
-| `AI_WORKING` | Agent | Agent is actively working on this card |
-| `IN_REVIEW` | Agent | Agent finished — waiting for human review |
-| `BLOCKED` | Agent | Hard external blocker (third party, missing credential, infra issue) |
+| Label | Set by | Color | Meaning |
+|---|---|---|---|
+| `AI_READY` | Human | lime | Card has enough context for the agent to act without asking questions |
+| `AI_WORKING` | Agent | sky | Agent is actively working on this card |
+| `IN_REVIEW` | Agent | orange | Agent finished — waiting for human review |
+| `BLOCKED` | Agent | red | Hard external blocker (third party, missing credential, infra issue) |
 
-**Lifecycle:**
+**Lifecycle — columns and labels move together:**
 
-| Event | Remove | Add |
-|---|---|---|
-| Agent picks up card | `AI_READY` | `AI_WORKING` |
-| Agent finishes | `AI_WORKING` | `IN_REVIEW` |
-| Agent blocked | — | `BLOCKED` |
-| Agent unblocked / resumes | `BLOCKED`, `IN_REVIEW` | `AI_WORKING` |
+| Event | Column | Label: Remove | Label: Add |
+|---|---|---|---|
+| Agent picks up card | → In Progress | `AI_READY` | `AI_WORKING` |
+| Agent finishes | → Done | `AI_WORKING` | `IN_REVIEW` |
+| Agent blocked | → Blocked | — | `BLOCKED` |
+| Agent unblocked / resumes | → In Progress | `BLOCKED`, `IN_REVIEW` | `AI_WORKING` |
+| Human approves | — (stays in Done) | `IN_REVIEW` | — |
 
-You can also use any custom labels on your cards — the agent can filter by them using `jv_search_cards` with a `label:` query. For example, tag cards `URGENT` or `Q2` and ask the agent to work only on those.
+The card ends in Done with no lifecycle labels. `IN_REVIEW` is the signal that the agent finished but you haven't verified yet — the column is already Done.
+
+All boards are expected to have at minimum: **Backlog, In Progress, Blocked, Done**. The agent only moves cards to other columns (e.g. "Todo", "In Review") if you explicitly ask for it.
+
+**Review handoff — how to close the loop:**
+
+When you're happy with the agent's work, tell it "reviewed", "approved", or "looks good". The agent will:
+1. Remove the `IN_REVIEW` label (card stays in Done)
+2. Post a `[NOTE]` confirming cleanup
+3. Run `git worktree remove .worktrees/<featureName>`
+
+The worktree is never deleted automatically — it always waits for your review signal.
+
+You can also use any custom labels for filtering — tag cards `URGENT` or `Q2` and ask the agent to work only on those.
 
 Find everything ready for the agent:
 
