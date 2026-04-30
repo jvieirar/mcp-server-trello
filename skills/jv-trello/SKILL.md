@@ -73,7 +73,17 @@ Check that all four lifecycle labels exist: `AI_READY`, `AI_WORKING`, `IN_REVIEW
 
 After creating, re-fetch labels and rebuild the map so all IDs are current. Store as `labelMap: Record<string, string>` (label name → label ID) for use throughout the session.
 
-### 4 — Cache mandatory columns
+### 4 — Verify board prefix
+
+Call `jv_list_board_prefixes` and check that a prefix is registered for the active board. If none is registered, ask the user for a prefix before proceeding — **do not create any cards without a prefix**.
+
+```json
+{ "name": "jv_list_board_prefixes", "arguments": {} }
+```
+
+Store the active board's prefix as `boardPrefix` for use in all `jv_add_card_to_list` calls this session.
+
+### 5 — Cache mandatory columns
 
 Call `jv_get_lists` and find the four mandatory columns by name (case-insensitive match):
 
@@ -215,6 +225,7 @@ Every mutation returns a minimal confirmation. Never read card state from a muta
 ## Tool ordering rules
 
 - **Before creating:** always `jv_search_cards` first to check for duplicates
+- **Every card creation:** always pass `boardPrefix` — **creating a card without a short ID is an error**
 - **Before moving or archiving:** always resolve the card (`jv_find_card_by_short_id` or `jv_search_cards`) first
 - **Before moving:** always `jv_get_lists` to get the target list ID unless already cached this session
 
@@ -222,7 +233,9 @@ Every mutation returns a minimal confirmation. Never read card state from a muta
 
 ## Short ID system
 
-Cards can be given human-readable IDs like `JVT-4` at creation time, appended as `[JVT-4]` to the card name.
+**Every card created by an agent must have a short ID.** Always pass `boardPrefix` to `jv_add_card_to_list`. Never omit it. If the prefix isn't known, check `jv_list_board_prefixes` or ask the user — but do not skip it.
+
+Cards get a human-readable ID like `JVT-4` appended to their name as `[JVT-4]` at creation time.
 
 ### First-time setup
 
