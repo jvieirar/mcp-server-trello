@@ -1,4 +1,7 @@
 #!/usr/bin/env bun
+/// <reference types="node" />
+/// <reference types="bun" />
+
 export {};
 // Register a Trello member-level webhook pointing to your public callback URL.
 // One member-level webhook covers all boards — no per-board registration needed.

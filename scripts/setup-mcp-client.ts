@@ -1,3 +1,6 @@
+/// <reference types="node" />
+/// <reference types="bun" />
+
 export {};
 
 /**
@@ -40,13 +43,16 @@ async function setupGemini(_apiKey: string, _token: string) {
   const wrapperScript = path.join(SERVER_DIR, 'scripts', 'start-mcp.sh');
 
   // Remove existing entry first (ignore failure if not registered)
-  const remove = Bun.spawn(['gemini', 'mcp', 'remove', 'jv-trello'], { stdout: 'pipe', stderr: 'pipe' });
+  const remove = Bun.spawn(['gemini', 'mcp', 'remove', 'jv-trello'], {
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
   await remove.exited;
 
-  const proc = Bun.spawn([
-    'gemini', 'mcp', 'add', 'jv-trello', wrapperScript,
-    '--scope', 'user',
-  ], { stdout: 'pipe', stderr: 'pipe' });
+  const proc = Bun.spawn(['gemini', 'mcp', 'add', 'jv-trello', wrapperScript, '--scope', 'user'], {
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
 
   await proc.exited;
   const settingsFile = path.join(HOME, '.gemini', 'settings.json');
@@ -65,7 +71,7 @@ async function setupClaudeCode(apiKey: string, token: string) {
 
   if (!config.env || typeof config.env !== 'object') config.env = {};
   (config.env as Record<string, string>)['TRELLO_API_KEY'] = apiKey;
-  (config.env as Record<string, string>)['TRELLO_TOKEN']   = token;
+  (config.env as Record<string, string>)['TRELLO_TOKEN'] = token;
 
   const perms = (config.permissions ?? { allow: [] }) as { allow?: string[] };
   if (!perms.allow) perms.allow = [];
@@ -80,11 +86,11 @@ async function setupClaudeCode(apiKey: string, token: string) {
 
 async function main() {
   const args = process.argv.slice(2);
-  const doGemini     = args.includes('--gemini')     || args.includes('--all') || args.length === 0;
+  const doGemini = args.includes('--gemini') || args.includes('--all') || args.length === 0;
   const doClaudeCode = args.includes('--claude-code') || args.includes('--all');
 
   const apiKey = process.env.TRELLO_API_KEY;
-  const token  = process.env.TRELLO_TOKEN;
+  const token = process.env.TRELLO_TOKEN;
 
   if (!apiKey || !token) {
     console.error('Error: TRELLO_API_KEY and TRELLO_TOKEN must be set in env or .env / .env.local');
@@ -94,13 +100,13 @@ async function main() {
   console.log(`\njv-trello MCP client setup`);
   console.log(`Server: ${SERVER_ENTRY}\n`);
 
-  if (doGemini)     await setupGemini(apiKey, token);
+  if (doGemini) await setupGemini(apiKey, token);
   if (doClaudeCode) await setupClaudeCode(apiKey, token);
 
   console.log('\nDone. Restart your AI client to pick up the new MCP server.');
 }
 
-main().catch((err) => {
+main().catch(err => {
   console.error(err);
   process.exit(1);
 });
