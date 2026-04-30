@@ -27,9 +27,7 @@ import * as path from 'path';
 import { createReadStream } from 'fs';
 import { fileURLToPath } from 'url';
 
-// Path for storing active board/workspace configuration
-const CONFIG_DIR = path.join(process.env.HOME || process.env.USERPROFILE || '.', '.trello-mcp');
-const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
+import { JV_DIR, CONFIG_FILE, LEGACY_CONFIG_FILE } from './paths.js';
 
 type TrelloRequestReturn =
   | TrelloAction
@@ -95,8 +93,24 @@ export class TrelloClient {
    */
   public async loadConfig(): Promise<void> {
     try {
-      await fs.mkdir(CONFIG_DIR, { recursive: true });
-      const data = await fs.readFile(CONFIG_FILE, 'utf8');
+      await fs.mkdir(JV_DIR, { recursive: true });
+
+      // Migrate legacy config (~/.trello-mcp/config.json) on first run
+      let configPath = CONFIG_FILE;
+      try {
+        await fs.access(CONFIG_FILE);
+      } catch {
+        try {
+          await fs.access(LEGACY_CONFIG_FILE);
+          await fs.copyFile(LEGACY_CONFIG_FILE, CONFIG_FILE);
+          console.error('[config] Migrated ~/.trello-mcp/config.json → ~/.jv-trello/config.json');
+          configPath = CONFIG_FILE;
+        } catch {
+          // Neither exists — fresh start
+        }
+      }
+
+      const data = await fs.readFile(configPath, 'utf8');
       const savedConfig = JSON.parse(data);
 
       // Only update boardId and workspaceId, keep credentials from env
@@ -123,7 +137,7 @@ export class TrelloClient {
    */
   private async saveConfig(): Promise<void> {
     try {
-      await fs.mkdir(CONFIG_DIR, { recursive: true });
+      await fs.mkdir(JV_DIR, { recursive: true });
       const configToSave = {
         boardId: this.activeConfig.boardId,
         workspaceId: this.activeConfig.workspaceId,
@@ -420,6 +434,13 @@ export class TrelloClient {
         idList: listId,
         ...(effectiveBoardId && { idBoard: effectiveBoardId }),
       });
+      return response.data;
+    });
+  }
+
+  async transitionCard(cardId: string, updates: { idList: string; idLabels: string[] }): Promise<TrelloCard> {
+    return this.handleRequest(async () => {
+      const response = await this.axiosInstance.put(`/cards/${cardId}`, updates);
       return response.data;
     });
   }

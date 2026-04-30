@@ -5,6 +5,9 @@ import { z } from 'zod';
 import { TrelloClient } from './trello-client.js';
 import { TrelloHealthEndpoints, HealthEndpointSchemas } from './health/health-endpoints.js';
 import { startWebhookServer } from './webhook.js';
+import { LOGS_DIR } from './paths.js';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 
 class TrelloServer {
   private server: McpServer;
@@ -287,6 +290,85 @@ class TrelloServer {
           const card = await this.trelloClient.moveCard(boardId, cardId, listId);
           return {
             content: [{ type: 'text' as const, text: JSON.stringify({ id: card.id, idList: card.idList }, null, 2) }],
+          };
+        } catch (error) {
+          return this.handleError(error);
+        }
+      }
+    );
+
+    // Atomic lifecycle transition — move + label swap in one step
+    this.server.registerTool(
+      'jv_lifecycle_transition',
+      {
+        title: 'Lifecycle Transition',
+        description: `Atomically moves a card to the correct column AND swaps lifecycle labels in a single operation.
+Use this instead of separate jv_move_card + jv_update_card_details calls for lifecycle events.
+
+Transitions:
+- pickup   → "In Progress" list, remove AI_READY,  add AI_WORKING
+- complete → "Done" list,        remove AI_WORKING, add IN_REVIEW
+- block    → "Blocked" list,     keep existing,     add BLOCKED
+- unblock  → "In Progress" list, remove BLOCKED + IN_REVIEW, add AI_WORKING`,
+        inputSchema: {
+          cardId: z.string().describe('ID of the card to transition'),
+          transition: z
+            .enum(['pickup', 'complete', 'block', 'unblock'])
+            .describe('Lifecycle transition to apply'),
+          boardId: z
+            .string()
+            .optional()
+            .describe('Board ID (uses active board if not provided)'),
+        },
+      },
+      async ({ cardId, transition, boardId }) => {
+        try {
+          const [lists, allLabels, cardResult] = await Promise.all([
+            this.trelloClient.getLists(boardId),
+            this.trelloClient.getBoardLabels(boardId),
+            this.trelloClient.getCard(cardId, false, true),
+          ]);
+
+          const listMap: Record<string, string> = {};
+          for (const list of lists) listMap[list.name.toLowerCase()] = list.id;
+
+          const labelMap: Record<string, string> = {};
+          for (const label of allLabels) if (label.name) labelMap[label.name] = label.id;
+
+          const card = cardResult as import('./types.js').EnhancedTrelloCard;
+          const currentIds: string[] = (card.idLabels as string[] | undefined) ?? card.labels?.map((l) => l.id) ?? [];
+
+          const rules: Record<string, { listName: string; remove: string[]; add: string[] }> = {
+            pickup:   { listName: 'in progress', remove: ['AI_READY'],              add: ['AI_WORKING'] },
+            complete: { listName: 'done',         remove: ['AI_WORKING'],             add: ['IN_REVIEW']  },
+            block:    { listName: 'blocked',      remove: [],                         add: ['BLOCKED']    },
+            unblock:  { listName: 'in progress',  remove: ['BLOCKED', 'IN_REVIEW'],   add: ['AI_WORKING'] },
+          };
+
+          const rule = rules[transition];
+          const targetListId = listMap[rule.listName];
+          if (!targetListId) throw new Error(`List "${rule.listName}" not found on board`);
+
+          const removeIds = new Set(rule.remove.map((n) => labelMap[n]).filter(Boolean));
+          const addIds = rule.add.map((n) => labelMap[n]).filter(Boolean);
+          const newLabelIds = [...new Set([...currentIds.filter((id) => !removeIds.has(id)), ...addIds])];
+
+          const updated = await this.trelloClient.transitionCard(cardId, {
+            idList: targetListId,
+            idLabels: newLabelIds,
+          });
+
+          return {
+            content: [{
+              type: 'text' as const,
+              text: JSON.stringify({
+                id: updated.id,
+                transition,
+                idList: updated.idList,
+                labelsAdded: rule.add,
+                labelsRemoved: rule.remove,
+              }),
+            }],
           };
         } catch (error) {
           return this.handleError(error);
@@ -1708,12 +1790,49 @@ class TrelloServer {
         return this.handleError(error);
       }
     });
+
+    // Read webhook event logs — call only when you need to inspect recent events
+    this.server.registerTool(
+      'jv_get_webhook_logs',
+      {
+        title: 'Get Webhook Logs',
+        description:
+          'Read recent webhook event logs from ~/.jv-trello/logs. ' +
+          'Use only when you need to inspect what Trello events have been received — not part of the normal workflow.',
+        inputSchema: {
+          date: z
+            .string()
+            .optional()
+            .describe('Log date in YYYY-MM-DD format (defaults to today)'),
+          tail: z
+            .number()
+            .optional()
+            .default(50)
+            .describe('Maximum number of lines to return from the end of the file (default: 50)'),
+        },
+      },
+      async ({ date, tail }) => {
+        try {
+          const logDate = date ?? new Date().toISOString().slice(0, 10);
+          const logFile = path.join(LOGS_DIR, `webhook-${logDate}.log`);
+          const text = await fs.readFile(logFile, 'utf8');
+          const lines = text.trimEnd().split('\n');
+          const slice = lines.slice(-tail!).join('\n');
+          return { content: [{ type: 'text' as const, text: slice || '(no entries)' }] };
+        } catch (error) {
+          if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+            return { content: [{ type: 'text' as const, text: '(no log file for that date)' }] };
+          }
+          return this.handleError(error);
+        }
+      }
+    );
   }
 
   async run() {
     const transport = new StdioServerTransport();
     await this.trelloClient.loadConfig().catch(() => {});
-    startWebhookServer();
+    await startWebhookServer();
     await this.server.connect(transport);
   }
 }

@@ -60,6 +60,9 @@ The dominant waste in the original server is `list_boards` alone — 59% of all 
 - [Bun](https://bun.sh) v1.0+
 - A Trello API key and token (see [Configuration](#configuration))
 
+**Optional — real-time webhooks:**
+Receive Trello events instantly instead of polling. See [docs/trello_webhooks_setup.md](docs/trello_webhooks_setup.md) for the full setup guide (Tailscale Funnel + registration script).
+
 **For the short ID system** — the prefix registry is managed at runtime. No restart is ever needed.
 
 **MCP config — with explicit env vars:**
