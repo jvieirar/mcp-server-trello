@@ -8,17 +8,17 @@ This fork adds response-size optimizations and new tools that significantly redu
 
 During a 152-comment card migration job the original server was generating 3–5 KB per mutation call. Seven targeted changes cut that down:
 
-| Change | Before | After | Why |
-|--------|--------|-------|-----|
-| `jv_add_comment` response | Full Trello action object (~4 KB) | `{ id }` | Agent only needs confirmation |
-| `jv_move_card` response | Full card object | `{ id, idList }` | Agent only needs the new location |
-| `jv_update_card_details` response | Full card object | `{ id }` | Agent only needs confirmation |
-| `jv_get_my_cards` | All fields, all statuses | Slim fields, open cards only (configurable) | Dramatically smaller list responses |
-| `jv_get_lists` | All list fields | `id, name` only (configurable) | Agents almost never need more |
-| `jv_get_card` | Always fetches everything | `lightweight` param for slim lookups | Full mode still available when needed |
-| `jv_search_cards` | Did not exist | New tool hitting `/search` directly | Find cards without fetching an entire list |
-| Short ID system | Did not exist | `[PREFIX-N]` suffix on card names + resolver | Human-readable card references across sessions |
-| `jv_archive_card` response | Full card object (~850 tokens) | `{ id, closed: true }` | Agent only needs confirmation |
+| Change                            | Before                            | After                                        | Why                                            |
+| --------------------------------- | --------------------------------- | -------------------------------------------- | ---------------------------------------------- |
+| `jv_add_comment` response         | Full Trello action object (~4 KB) | `{ id }`                                     | Agent only needs confirmation                  |
+| `jv_move_card` response           | Full card object                  | `{ id, idList }`                             | Agent only needs the new location              |
+| `jv_update_card_details` response | Full card object                  | `{ id }`                                     | Agent only needs confirmation                  |
+| `jv_get_my_cards`                 | All fields, all statuses          | Slim fields, open cards only (configurable)  | Dramatically smaller list responses            |
+| `jv_get_lists`                    | All list fields                   | `id, name` only (configurable)               | Agents almost never need more                  |
+| `jv_get_card`                     | Always fetches everything         | `lightweight` param for slim lookups         | Full mode still available when needed          |
+| `jv_search_cards`                 | Did not exist                     | New tool hitting `/search` directly          | Find cards without fetching an entire list     |
+| Short ID system                   | Did not exist                     | `[PREFIX-N]` suffix on card names + resolver | Human-readable card references across sessions |
+| `jv_archive_card` response        | Full card object (~850 tokens)    | `{ id, closed: true }`                       | Agent only needs confirmation                  |
 
 ### Benchmark — `trello` vs `trello-jv`
 
@@ -26,26 +26,26 @@ Real-world session moving 9 cards across lists with comments and an archive step
 
 #### Session-level results
 
-| Metric | `trello` (original) | `trello-jv` (optimized) | Delta |
-|--------|--------------------|-----------------------|-------|
-| **Total session tokens** | 30,216 | 20,886 | **−31%** |
-| **Duration** | 102,029 ms | 71,732 ms | **−30%** |
-| Trello API calls | 9 | 9 | — |
+| Metric                   | `trello` (original) | `trello-jv` (optimized) | Delta    |
+| ------------------------ | ------------------- | ----------------------- | -------- |
+| **Total session tokens** | 30,216              | 20,886                  | **−31%** |
+| **Duration**             | 102,029 ms          | 71,732 ms               | **−30%** |
+| Trello API calls         | 9                   | 9                       | —        |
 
 #### Per-call payload breakdown
 
-| # | Step | `trello` tokens | `trello-jv` tokens | Reduction |
-|---|------|-----------------|--------------------|-----------|
-| 1 | `list_boards` | ~8,500 | ~90 | **−99%** |
-| 2 | `get_lists` | ~120 | ~30 | −75% |
-| 3 | `add_card_to_list` | ~950 | ~35 | **−96%** |
-| 4 | `add_comment` | ~750 | ~10 | **−99%** |
-| 5 | `move_card` | ~850 | ~15 | **−98%** |
-| 6 | `add_comment` | ~750 | ~10 | **−99%** |
-| 7 | `move_card` | ~850 | ~15 | **−98%** |
-| 8 | `add_comment` | ~750 | ~10 | **−99%** |
-| 9 | `archive_card` | ~850 | ~10 | **−99%** |
-| | **Total** | **~14,370** | **~225** | **−98%** |
+| #   | Step               | `trello` tokens | `trello-jv` tokens | Reduction |
+| --- | ------------------ | --------------- | ------------------ | --------- |
+| 1   | `list_boards`      | ~8,500          | ~90                | **−99%**  |
+| 2   | `get_lists`        | ~120            | ~30                | −75%      |
+| 3   | `add_card_to_list` | ~950            | ~35                | **−96%**  |
+| 4   | `add_comment`      | ~750            | ~10                | **−99%**  |
+| 5   | `move_card`        | ~850            | ~15                | **−98%**  |
+| 6   | `add_comment`      | ~750            | ~10                | **−99%**  |
+| 7   | `move_card`        | ~850            | ~15                | **−98%**  |
+| 8   | `add_comment`      | ~750            | ~10                | **−99%**  |
+| 9   | `archive_card`     | ~850            | ~10                | **−99%**  |
+|     | **Total**          | **~14,370**     | **~225**           | **−98%**  |
 
 The dominant waste in the original server is `list_boards` alone — 59% of all output tokens from a single discovery call. Every mutation (add, move, comment, archive) returns a full card or action object even though the agent only needs to know "did it work?"
 
@@ -56,6 +56,7 @@ The dominant waste in the original server is `list_boards` alone — 59% of all 
 ### Setup and prerequisites
 
 **Required:**
+
 - [Bun](https://bun.sh) v1.0+
 - A Trello API key and token (see [Configuration](#configuration))
 
@@ -68,7 +69,10 @@ The dominant waste in the original server is `list_boards` alone — 59% of all 
   "mcpServers": {
     "trello-jv": {
       "command": "bun",
-      "args": ["run", "/Users/juanvieira/development/codebases/tools/mcp-server-trello/src/index.ts"],
+      "args": [
+        "run",
+        "/Users/juanvieira/development/codebases/tools/mcp-server-trello/src/index.ts"
+      ],
       "env": {
         "TRELLO_API_KEY": "your-api-key",
         "TRELLO_TOKEN": "your-token"
@@ -97,17 +101,19 @@ Env var values are merged with the persisted registry at startup. Env wins on co
 Once the MCP server is connected, run these three tool calls in Claude to map your boards to short prefixes:
 
 **Step 1 — List your boards to get their IDs:**
+
 ```json
 { "name": "jv_list_boards", "arguments": {} }
 ```
 
 **Step 2 — Register your chosen prefixes:**
+
 ```json
 {
   "name": "jv_setup_board_prefixes",
   "arguments": {
     "mappings": [
-      { "prefix": "JVT",  "boardId": "<id from step 1>" },
+      { "prefix": "JVT", "boardId": "<id from step 1>" },
       { "prefix": "TATA", "boardId": "<id from step 1>" }
     ]
   }
@@ -115,6 +121,7 @@ Once the MCP server is connected, run these three tool calls in Claude to map yo
 ```
 
 **Step 3 — Confirm the registry:**
+
 ```json
 { "name": "jv_list_board_prefixes", "arguments": {} }
 ```
@@ -122,7 +129,10 @@ Once the MCP server is connected, run these three tool calls in Claude to map yo
 Registered prefixes are written to `~/.trello-mcp/config.json` and survive restarts. To add a new board later, one call is enough — no config file edit, no restart:
 
 ```json
-{ "name": "jv_register_board_prefix", "arguments": { "prefix": "PROJ", "boardId": "your-board-id" } }
+{
+  "name": "jv_register_board_prefix",
+  "arguments": { "prefix": "PROJ", "boardId": "your-board-id" }
+}
 ```
 
 ### Agent skill
@@ -155,11 +165,11 @@ stateDiagram-v2
     Mutation --> Done : all mutations complete
     Done --> [*]
 
-    Setup : Read jv_get_active_board_info\nParse board desc config\nSet up worktree if needed
-    Discovery : jv_search_cards / jv_get_lists\njv_find_card_by_short_id
-    Planning : Decide steps\nPost [PLAN] comment
-    Mutation : jv_move_card / jv_add_comment\njv_archive_card / jv_update_card_details
-    Done : Post [RESULT] / [NOTE]\nCommit if autoCommit = true
+    Setup : Read jv_get_active_board_info Parse board desc config Set up worktree if needed
+    Discovery : jv_search_cards / jv_get_lists jv_find_card_by_short_id
+    Planning : Decide steps Post [PLAN] comment
+    Mutation : jv_move_card / jv_add_comment jv_archive_card / jv_update_card_details
+    Done : Post [RESULT] / [NOTE] Commit if autoCommit = true
 ```
 
 #### Board config (in the board's Description field)
@@ -188,7 +198,7 @@ flowchart TD
     A[Read board desc] --> B{Config present?}
     B -- no --> C[Default: ask user]
     B -- yes --> D{worktrees.create}
-    D -- always --> E[git worktree add\n.worktrees/featureName\n-b feature/featureName]
+    D -- always --> E[git worktree add .worktrees/featureName -b feature/featureName]
     D -- ask --> F[Ask user before creating]
     D -- never --> G[Work in current branch]
     C --> F
@@ -200,13 +210,13 @@ One session = one worktree. Subagents always inherit the parent's `cwd` and neve
 
 The agent leaves structured comments on cards throughout its work. Every comment is prefixed with a type tag so you always know what the agent is doing and why.
 
-| Tag | When the agent posts it |
-|---|---|
-| `[PLAN]` | Before starting — the steps it will take and what it is explicitly not doing |
-| `[DECISION]` | At the moment it makes a non-trivial judgment call |
-| `[RESULT]` | After finishing — what changed, what files were touched, any follow-ups |
-| `[NOTE]` | Context that isn't a plan or result: worktree path, session info, admin notes |
-| `[QUESTION]` | When it needs user input to continue |
+| Tag          | When the agent posts it                                                       |
+| ------------ | ----------------------------------------------------------------------------- |
+| `[PLAN]`     | Before starting — the steps it will take and what it is explicitly not doing  |
+| `[DECISION]` | At the moment it makes a non-trivial judgment call                            |
+| `[RESULT]`   | After finishing — what changed, what files were touched, any follow-ups       |
+| `[NOTE]`     | Context that isn't a plan or result: worktree path, session info, admin notes |
+| `[QUESTION]` | When it needs user input to continue                                          |
 
 Example `[RESULT]` comment on a card:
 
@@ -223,25 +233,25 @@ Example `[RESULT]` comment on a card:
 
 Every mutation tool returns a minimal confirmation — the agent never reads card state back from a mutation response. If it needs the updated card, it calls `jv_get_card` separately.
 
-| Tool | Returns |
-|---|---|
-| `jv_add_comment` | `{ id }` |
-| `jv_move_card` | `{ id, idList }` |
-| `jv_update_card_details` | `{ id }` |
-| `jv_archive_card` | `{ id, closed: true }` |
-| `jv_add_card_to_list` | `{ id, name, shortLink, url, shortId? }` |
-| `jv_list_boards` | `[{ id, name, closed }]` |
-| `jv_get_lists` | `[{ id, name }]` by default |
+| Tool                     | Returns                                  |
+| ------------------------ | ---------------------------------------- |
+| `jv_add_comment`         | `{ id }`                                 |
+| `jv_move_card`           | `{ id, idList }`                         |
+| `jv_update_card_details` | `{ id }`                                 |
+| `jv_archive_card`        | `{ id, closed: true }`                   |
+| `jv_add_card_to_list`    | `{ id, name, shortLink, url, shortId? }` |
+| `jv_list_boards`         | `[{ id, name, closed }]`                 |
+| `jv_get_lists`           | `[{ id, name }]` by default              |
 
 #### Tool ordering rules
 
 ```mermaid
 flowchart LR
     A[User intent] --> B{Creating?}
-    B -- yes --> C[jv_search_cards\ncheck duplicates]
+    B -- yes --> C[jv_search_cards check duplicates]
     C --> D[jv_add_card_to_list]
     B -- no --> E{Moving?}
-    E -- yes --> F[jv_find_card_by_short_id\nor jv_search_cards]
+    E -- yes --> F[jv_find_card_by_short_id or jv_search_cards]
     F --> G[jv_get_lists]
     G --> H[jv_move_card]
     E -- no --> I{Archiving?}
@@ -249,19 +259,29 @@ flowchart LR
     J --> K[jv_archive_card]
 ```
 
-#### Suggested labels for efficient search
+#### Labels — lifecycle and search
 
-The agent can search cards by label using `jv_search_cards` with a `label:` query. Consistent label names let you build workflows the agent can act on without manual triage. Suggested label set:
+The agent manages four labels automatically as it works. Create these on your board and the agent will apply and remove them at the right moments:
 
-| Label | Meaning |
-|---|---|
-| `AI_READY` | Card has enough context for an agent to act on it without asking questions |
-| `NEEDS_CONTEXT` | Card is blocked until a human adds more information |
-| `IN_REVIEW` | Card is waiting for human review before the agent continues |
-| `BLOCKED` | Hard external blocker — third party, missing credential, infra issue |
-| `RECURRING` | Card represents a repeating task |
+| Label | Set by | Meaning |
+|---|---|---|
+| `AI_READY` | Human | Card has enough context for the agent to act without asking questions |
+| `AI_WORKING` | Agent | Agent is actively working on this card |
+| `IN_REVIEW` | Agent | Agent finished — waiting for human review |
+| `BLOCKED` | Agent | Hard external blocker (third party, missing credential, infra issue) |
 
-Search example — find everything ready for the agent to work on:
+**Lifecycle:**
+
+| Event | Remove | Add |
+|---|---|---|
+| Agent picks up card | `AI_READY` | `AI_WORKING` |
+| Agent finishes | `AI_WORKING` | `IN_REVIEW` |
+| Agent blocked | — | `BLOCKED` |
+| Agent unblocked / resumes | `BLOCKED`, `IN_REVIEW` | `AI_WORKING` |
+
+You can also use any custom labels on your cards — the agent can filter by them using `jv_search_cards` with a `label:` query. For example, tag cards `URGENT` or `Q2` and ask the agent to work only on those.
+
+Find everything ready for the agent:
 
 ```json
 { "name": "jv_search_cards", "arguments": { "query": "label:AI_READY", "boardIds": ["your-board-id"], "limit": 20 } }
@@ -306,9 +326,9 @@ A Model Context Protocol (MCP) server that provides tools for interacting with T
 
 ### ✨ New in This Release:
 
-  - 🚀 **Performance Boost**: Enjoy a faster, more responsive server.
-  -  BUN **Bun-Powered**: The project now runs on the lightning-fast Bun runtime.
-  - 📖 **Comprehensive Examples**: A new `examples` directory with detailed implementations in JavaScript, Python, and TypeScript.
+- 🚀 **Performance Boost**: Enjoy a faster, more responsive server.
+- BUN **Bun-Powered**: The project now runs on the lightning-fast Bun runtime.
+- 📖 **Comprehensive Examples**: A new `examples` directory with detailed implementations in JavaScript, Python, and TypeScript.
 
 **Plus:** Modern MCP SDK architecture, enhanced type safety, and comprehensive documentation!
 
@@ -318,16 +338,16 @@ For a detailed list of changes, please refer to the [CHANGELOG.md](CHANGELOG.md)
 
 ## Features
 
-  - **Full Trello Board Integration**: Interact with cards, lists, and board activities
-  - **🆕 Complete Card Data Extraction**: Fetch all card details including checklists, attachments, labels, members, and comments
-  - **💬 Comment Management**: Add, update, delete, and retrieve comments on cards
-  - **File Attachments**: Attach any type of file to cards (PDFs, documents, videos, images, etc.) from URLs
-  - **Built-in Rate Limiting**: Respects Trello's API limits (300 requests/10s per API key, 100 requests/10s per token)
-  - **Type-Safe Implementation**: Written in TypeScript with comprehensive type definitions
-  - **Input Validation**: Robust validation for all API inputs
-  - **Error Handling**: Graceful error handling with informative messages
-  - **Dynamic Board Selection**: Switch between boards and workspaces without restarting
-  - **Markdown Formatting**: Export card data in human-readable markdown format
+- **Full Trello Board Integration**: Interact with cards, lists, and board activities
+- **🆕 Complete Card Data Extraction**: Fetch all card details including checklists, attachments, labels, members, and comments
+- **💬 Comment Management**: Add, update, delete, and retrieve comments on cards
+- **File Attachments**: Attach any type of file to cards (PDFs, documents, videos, images, etc.) from URLs
+- **Built-in Rate Limiting**: Respects Trello's API limits (300 requests/10s per API key, 100 requests/10s per token)
+- **Type-Safe Implementation**: Written in TypeScript with comprehensive type definitions
+- **Input Validation**: Robust validation for all API inputs
+- **Error Handling**: Graceful error handling with informative messages
+- **Dynamic Board Selection**: Switch between boards and workspaces without restarting
+- **Markdown Formatting**: Export card data in human-readable markdown format
 
 ## Installation
 
@@ -347,16 +367,16 @@ If you have [Bun](https://bun.sh) installed, using `bunx` is the fastest way to 
 
 ```json
 {
-  "mcpServers": {
-    "trello": {
-      "command": "bunx",
-      "args": ["@delorenj/mcp-server-trello"],
-      "env": {
-        "TRELLO_API_KEY": "your-api-key",
-        "TRELLO_TOKEN": "your-token"
-      }
-    }
-  }
+  "mcpServers": {
+    "trello": {
+      "command": "bunx",
+      "args": ["@delorenj/mcp-server-trello"],
+      "env": {
+        "TRELLO_API_KEY": "your-api-key",
+        "TRELLO_TOKEN": "your-token"
+      }
+    }
+  }
 }
 ```
 
@@ -366,16 +386,16 @@ You can still use `npx` or `pnpx`. This doesn't require a global install and wil
 
 ```json
 {
-  "mcpServers": {
-    "trello": {
-      "command": "bunx",
-      "args": ["@delorenj/mcp-server-trello"],
-      "env": {
-        "TRELLO_API_KEY": "your-api-key",
-        "TRELLO_TOKEN": "your-token"
-      }
-    }
-  }
+  "mcpServers": {
+    "trello": {
+      "command": "bunx",
+      "args": ["@delorenj/mcp-server-trello"],
+      "env": {
+        "TRELLO_API_KEY": "your-api-key",
+        "TRELLO_TOKEN": "your-token"
+      }
+    }
+  }
 }
 ```
 
@@ -383,16 +403,16 @@ Or if you're using mise, you can explicitly execute `bunx` with `mise exec`:
 
 ```json
 {
-  "mcpServers": {
-    "trello": {
-      "command": "mise",
-      "args": ["x", "--", "bunx", "@delorenj/mcp-server-trello"],
-      "env": {
-        "TRELLO_API_KEY": "your-api-key",
-        "TRELLO_TOKEN": "your-token"
-      }
-    }
-  }
+  "mcpServers": {
+    "trello": {
+      "command": "mise",
+      "args": ["x", "--", "bunx", "@delorenj/mcp-server-trello"],
+      "env": {
+        "TRELLO_API_KEY": "your-api-key",
+        "TRELLO_TOKEN": "your-token"
+      }
+    }
+  }
 }
 ```
 
@@ -404,8 +424,8 @@ https://trello.com/1/authorize?expiration=never&name=YOUR_APP_NAME&scope=read,wr
 
 Replace:
 
-  * `YOUR_APP_NAME` with a name for your application (e.g., "My Trello Integration"). This name is shown to the user on the Trello authorization screen.
-  * `YOUR_API_KEY` with the API key for your Trello Power-Up
+- `YOUR_APP_NAME` with a name for your application (e.g., "My Trello Integration"). This name is shown to the user on the Trello authorization screen.
+- `YOUR_API_KEY` with the API key for your Trello Power-Up
 
 This will generate the token required for integration.
 
@@ -436,7 +456,7 @@ If you prefer using `npm` directly:
 npm install -g @delorenj/mcp-server-trello
 ```
 
-*(A fast alternative is `bun add -g @delorenj/mcp-server-trello`)*
+_(A fast alternative is `bun add -g @delorenj/mcp-server-trello`)_
 
 Then use `npx mcp-server-trello` as the command in your MCP configuration.
 
@@ -506,10 +526,10 @@ https_proxy=http://your-proxy:8080
 
 You can get these values from:
 
-  - API Key: [https://trello.com/app-key](https://trello.com/app-key)
-  - Token: Generate using your API key
-  - Board ID (optional, deprecated): Found in the board URL (e.g., [suspicious link removed])
-  - Workspace ID: Found in workspace settings or using `list_workspaces` tool
+- API Key: [https://trello.com/app-key](https://trello.com/app-key)
+- Token: Generate using your API key
+- Board ID (optional, deprecated): Found in the board URL (e.g., [suspicious link removed])
+- Workspace ID: Found in workspace settings or using `list_workspaces` tool
 
 ### Board and Workspace Management
 
@@ -592,8 +612,8 @@ This allows you to work with multiple boards and workspaces without restarting t
 
 When working with dates in the Trello MCP server, please note the different format requirements:
 
-  - **Due Date (`dueDate`)**: Accepts full ISO 8601 format with time (e.g., `2023-12-31T12:00:00Z`)
-  - **Start Date (`start`)**: Accepts date only in YYYY-MM-DD format (e.g., `2025-08-05`)
+- **Due Date (`dueDate`)**: Accepts full ISO 8601 format with time (e.g., `2023-12-31T12:00:00Z`)
+- **Start Date (`start`)**: Accepts date only in YYYY-MM-DD format (e.g., `2025-08-05`)
 
 This distinction follows Trello's API conventions where start dates are day-based markers while due dates can include specific times.
 
@@ -601,7 +621,7 @@ This distinction follows Trello's API conventions where start dates are day-base
 
 ### Checklist Management Tools 🆕
 
-#### get\_checklist\_items
+#### get_checklist_items
 
 Get all items from a checklist by name.
 
@@ -615,7 +635,7 @@ Get all items from a checklist by name.
 }
 ```
 
-#### add\_checklist\_item
+#### add_checklist_item
 
 Add a new item to an existing checklist.
 
@@ -630,7 +650,7 @@ Add a new item to an existing checklist.
 }
 ```
 
-#### find\_checklist\_items\_by\_description
+#### find_checklist_items_by_description
 
 Search for checklist items containing specific text.
 
@@ -644,7 +664,7 @@ nbsp; }
 }
 ```
 
-#### get\_acceptance\_criteria
+#### get_acceptance_criteria
 
 Get all items from the "Acceptance Criteria" checklist.
 
@@ -657,7 +677,7 @@ Get all items from the "Acceptance Criteria" checklist.
 }
 ```
 
-#### get\_checklist\_by\_name
+#### get_checklist_by_name
 
 Get a complete checklist with all items and completion percentage.
 
@@ -673,12 +693,12 @@ Get a complete checklist with all items and completion percentage.
 
 **Returns:** `CheckList` object with:
 
-  - `id`: Checklist identifier
-  - `name`: Checklist name
-  - `items`: Array of `CheckListItem` objects
-  - `percentComplete`: Completion percentage (0-100)
+- `id`: Checklist identifier
+- `name`: Checklist name
+- `items`: Array of `CheckListItem` objects
+- `percentComplete`: Completion percentage (0-100)
 
-#### update\_checklist\_item
+#### update_checklist_item
 
 Update an existing checklist item.
 
@@ -698,7 +718,7 @@ Update an existing checklist item.
 }
 ```
 
-#### delete\_checklist\_item
+#### delete_checklist_item
 
 Delete an existing checklist item.
 
@@ -712,7 +732,7 @@ Delete an existing checklist item.
 }
 ```
 
-### get\_card 🆕
+### get_card 🆕
 
 Get comprehensive details of a specific Trello card with human-level parity.
 
@@ -728,16 +748,16 @@ Get comprehensive details of a specific Trello card with human-level parity.
 
 **Returns:** Complete card data including:
 
-  - ✅ Checklists with item states and assignments
-  - 📎 Attachments with previews and metadata
-  - 🏷️ Labels with names and colors
-  - 👥 Assigned members
-  - 💬 Comments and activity
-  - 📊 Statistics (badges)
-  - 🎨 Cover images
-  - 📍 Board and list context
+- ✅ Checklists with item states and assignments
+- 📎 Attachments with previews and metadata
+- 🏷️ Labels with names and colors
+- 👥 Assigned members
+- 💬 Comments and activity
+- 📊 Statistics (badges)
+- 🎨 Cover images
+- 📍 Board and list context
 
-### get\_cards\_by\_list\_id
+### get_cards_by_list_id
 
 Fetch all cards from a specific list.
 
@@ -751,7 +771,7 @@ Fetch all cards from a specific list.
 }
 ```
 
-### get\_lists
+### get_lists
 
 Retrieve all lists from a board.
 
@@ -764,7 +784,7 @@ Retrieve all lists from a board.
 }
 ```
 
-### get\_recent\_activity
+### get_recent_activity
 
 Fetch recent activity on a board.
 
@@ -778,7 +798,7 @@ Fetch recent activity on a board.
 }
 ```
 
-### add\_card\_to\_list
+### add_card_to_list
 
 Add a new card to a specified list.
 
@@ -797,7 +817,7 @@ Add a new card to a specified list.
 }
 ```
 
-### update\_card\_details
+### update_card_details
 
 Update an existing card's details.
 
@@ -817,7 +837,7 @@ Update an existing card's details.
 }
 ```
 
-### archive\_card
+### archive_card
 
 Send a card to the archive.
 
@@ -831,7 +851,7 @@ Send a card to the archive.
 }
 ```
 
-### add\_list\_to\_board
+### add_list_to_board
 
 Add a new list to a board.
 
@@ -845,7 +865,7 @@ nbsp; name: 'add_list_to_board',
 }
 ```
 
-### archive\_list
+### archive_list
 
 Send a list to the archive.
 
@@ -859,7 +879,7 @@ Send a list to the archive.
 }
 ```
 
-### update\_list\_position
+### update_list_position
 
 Update the position of a list on the board. Trello uses fractional indexing: each list has a float position, and to place a list between two others, use the average of their positions (e.g., between pos 1024 and 2048, use 1536). Use `"top"`/`"bottom"` shortcuts to move to the edges.
 
@@ -873,7 +893,7 @@ Update the position of a list on the board. Trello uses fractional indexing: eac
 }
 ```
 
-### get\_my\_cards
+### get_my_cards
 
 Fetch all cards assigned to the current user.
 
@@ -884,7 +904,7 @@ Fetch all cards assigned to the current user.
 }
 ```
 
-### move\_card
+### move_card
 
 Move a card to a different list.
 
@@ -899,7 +919,7 @@ s;   cardId: string,    // ID of the card to move
 }
 ```
 
-### attach\_image\_to\_card
+### attach_image_to_card
 
 Attach an image to a card directly from a URL.
 
@@ -915,7 +935,7 @@ Attach an image to a card directly from a URL.
 }
 ```
 
-### attach\_file\_to\_card
+### attach_file_to_card
 
 Attach any type of file to a card from a URL or a local file path (e.g., `file:///path/to/your/file.pdf`).
 
@@ -934,7 +954,7 @@ nbsp; arguments: {
 
 ### Comment Management Tools
 
-#### add\_comment
+#### add_comment
 
 Add a comment to a Trello card.
 
@@ -948,7 +968,7 @@ Add a comment to a Trello card.
 }
 ```
 
-#### update\_comment
+#### update_comment
 
 Update an existing comment on a card.
 
@@ -962,7 +982,7 @@ Update an existing comment on a card.
 }
 ```
 
-#### delete\_comment
+#### delete_comment
 
 Delete a comment from a card.
 
@@ -975,7 +995,7 @@ Delete a comment from a card.
 }
 ```
 
-#### get\_card\_comments
+#### get_card_comments
 
 Retrieve all comments from a specific card without fetching all card data.
 
@@ -989,8 +1009,7 @@ Retrieve all comments from a specific card without fetching all card data.
 }
 ```
 
-
-### list\_boards
+### list_boards
 
 List all boards the user has access to.
 
@@ -1001,7 +1020,7 @@ List all boards the user has access to.
 }
 ```
 
-### set\_active\_board
+### set_active_board
 
 Set the active board for future operations.
 
@@ -1014,7 +1033,7 @@ Set the active board for future operations.
 }
 ```
 
-### list\_workspaces
+### list_workspaces
 
 List all workspaces the user has access to.
 
@@ -1025,7 +1044,7 @@ s; name: 'list_workspaces',
 }
 ```
 
-### set\_active\_workspace
+### set_active_workspace
 
 Set the active workspace for future operations.
 
@@ -1038,7 +1057,7 @@ Set the active workspace for future operations.
 }
 ```
 
-### list\_boards\_in\_workspace
+### list_boards_in_workspace
 
 List all boards in a specific workspace.
 
@@ -1051,7 +1070,7 @@ List all boards in a specific workspace.
 }
 ```
 
-### get\_active\_board\_info
+### get_active_board_info
 
 Get information about the currently active board.
 
@@ -1134,8 +1153,8 @@ Now you can seamlessly create visual content and organize it in Trello, all with
 
 The server implements a token bucket algorithm for rate limiting to comply with Trello's API limits:
 
-  - 300 requests per 10 seconds per API key
-  - 100 requests per 10 seconds per token
+- 300 requests per 10 seconds per API key
+- 100 requests per 10 seconds per token
 
 Rate limiting is handled automatically, and requests will be queued if limits are reached.
 
@@ -1143,17 +1162,17 @@ Rate limiting is handled automatically, and requests will be queued if limits ar
 
 The server provides detailed error messages for various scenarios:
 
-  - Invalid input parameters
-  - Rate limit exceeded
-  - API authentication errors
-  - Network issues
-  - Invalid board/list/card IDs
+- Invalid input parameters
+- Rate limit exceeded
+- API authentication errors
+- Network issues
+- Invalid board/list/card IDs
 
 ## Development
 
 ### Prerequisites
 
-  - [Bun](https://bun.sh) (v1.0.0 or higher)
+- [Bun](https://bun.sh) (v1.0.0 or higher)
 
 ### Setup
 
@@ -1208,5 +1227,5 @@ This project is licensed under the MIT License - see the [LICENSE](https://www.g
 
 ## Acknowledgments
 
-  - Built with the [Model Context Protocol SDK](https://github.com/modelcontextprotocol/typescript-sdk)
-  - Uses the [Trello REST API](https://developer.atlassian.com/cloud/trello/rest/)
+- Built with the [Model Context Protocol SDK](https://github.com/modelcontextprotocol/typescript-sdk)
+- Uses the [Trello REST API](https://developer.atlassian.com/cloud/trello/rest/)

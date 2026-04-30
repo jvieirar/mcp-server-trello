@@ -50,7 +50,17 @@ git worktree add .worktrees/<featureName> -b feature/<featureName>
 
 **One session = one worktree.** Subagents never create new worktrees — they inherit the parent's `cwd`.
 
-### 3 — Auto-commit and PR
+### 3 — Cache board labels
+
+Immediately after reading board config, fetch the board's labels and build a name→ID map:
+
+```json
+{ "name": "jv_get_board_labels", "arguments": {} }
+```
+
+Store the result as `labelMap: Record<string, string>` (label name → label ID). You will use this map throughout the session to apply and remove labels without extra lookups.
+
+### 4 — Auto-commit and PR
 
 | Flag | Behaviour |
 |---|---|
@@ -100,6 +110,28 @@ Format:
 ```
 
 `jv_add_comment` returns `{ id }` only — do not try to read the comment back.
+
+---
+
+## Label lifecycle
+
+Use the `labelMap` cached during session setup to apply and remove labels via `jv_update_card_details`. Pass the full intended label ID array — Trello replaces, not appends.
+
+| Event | Remove | Add |
+|---|---|---|
+| Agent picks up card | `AI_READY` | `AI_WORKING` |
+| Agent posts `[PLAN]` | — | — |
+| Agent finishes | `AI_WORKING` | `IN_REVIEW` |
+| Agent blocked | — | `BLOCKED` |
+| Agent unblocked / resumes | `BLOCKED`, `IN_REVIEW` | `AI_WORKING` |
+
+**How to update labels:**
+
+1. Read current label IDs from `jv_get_card` (lightweight) — field `labels[].id`
+2. Compute new set: remove outgoing IDs, add incoming IDs from `labelMap`
+3. Call `jv_update_card_details` with `labels: [newId1, newId2, ...]`
+
+If a label name isn't in `labelMap` (not created on the board yet), skip that label silently — never error.
 
 ---
 
