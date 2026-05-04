@@ -369,6 +369,7 @@ export class TrelloClient {
       start?: string;
       labels?: string[];
       boardPrefix?: string;
+      checklistItems?: string[];
     }
   ): Promise<TrelloCard & { shortId?: string }> {
     return this.handleRequest(async () => {
@@ -380,13 +381,24 @@ export class TrelloClient {
         start: params.start,
         idLabels: params.labels,
       });
-      const card = response.data;
+      let card = response.data;
 
       if (params.boardPrefix) {
         const shortId = `${params.boardPrefix}-${card.idShort}`;
         const updatedName = `${card.name} [${shortId}]`;
         const putResponse = await this.axiosInstance.put(`/cards/${card.id}`, { name: updatedName });
-        return { ...putResponse.data, shortId };
+        card = { ...putResponse.data, shortId };
+      }
+
+      if (params.checklistItems?.length) {
+        const checklistResponse = await this.axiosInstance.post<TrelloChecklist>(
+          `/cards/${card.id}/checklists`,
+          { name: 'Tasks' }
+        );
+        const checklistId = checklistResponse.data.id;
+        for (const item of params.checklistItems) {
+          await this.axiosInstance.post(`/checklists/${checklistId}/checkItems`, { name: item });
+        }
       }
 
       return card;

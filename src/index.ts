@@ -189,6 +189,10 @@ class TrelloServer {
             .optional()
             .describe('Array of label IDs to apply to the card'),
           boardPrefix: z.string().optional().describe('Board prefix for short ID (e.g. "JVT"). Requires BOARD_PREFIXES env var to be set.'),
+          checklistItems: z
+            .array(z.string())
+            .optional()
+            .describe('Optional list of task strings to add as a "Tasks" checklist on the card'),
         },
       },
       async args => {

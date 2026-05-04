@@ -86,8 +86,9 @@ async function setupClaudeCode(apiKey: string, token: string) {
 
 async function main() {
   const args = process.argv.slice(2);
-  const doGemini = args.includes('--gemini') || args.includes('--all') || args.length === 0;
-  const doClaudeCode = args.includes('--claude-code') || args.includes('--all');
+  const runAll = args.includes('--all') || args.length === 0;
+  const doGemini = runAll || args.includes('--gemini');
+  const doClaudeCode = runAll || args.includes('--claude-code');
 
   const apiKey = process.env.TRELLO_API_KEY;
   const token = process.env.TRELLO_TOKEN;

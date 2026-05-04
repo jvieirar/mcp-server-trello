@@ -65,17 +65,55 @@ Receive Trello events instantly instead of polling. See [docs/trello_webhooks_se
 
 **For the short ID system** — the prefix registry is managed at runtime. No restart is ever needed.
 
-**MCP config — with explicit env vars:**
+#### Step 1 — Clone and install
+
+```bash
+git clone https://github.com/<your-fork>/jv-trello-mcp.git
+cd jv-trello-mcp
+bun install
+```
+
+> No build step is required. Bun executes the TypeScript entry point directly — `bun run build` only exists for publishing to npm.
+
+#### Step 2 — Add your Trello credentials
+
+Create a `.env.local` file in the repo root:
+
+```bash
+TRELLO_API_KEY=your-api-key
+TRELLO_TOKEN=your-token
+```
+
+#### Step 3 — Register the MCP server with your client
+
+**Option A — automated (recommended):**
+
+```bash
+bun scripts/setup-mcp-client.ts            # both Claude Code and Gemini CLI
+bun scripts/setup-mcp-client.ts --claude-code
+bun scripts/setup-mcp-client.ts --gemini
+```
+
+This script:
+- Reads `TRELLO_API_KEY` / `TRELLO_TOKEN` from your `.env` / `.env.local` (or env vars)
+- Writes credentials and the `mcp__jv-trello__*` allow-list to `~/.claude/settings.json` (Claude Code)
+- Runs `gemini mcp add` so Gemini picks up the server via `scripts/start-mcp.sh` (Gemini CLI)
+- Points both clients at `src/index.ts` in this clone — restart your client to pick it up
+
+**Option B — manual:**
+
+```bash
+claude mcp add jv-trello -e TRELLO_API_KEY=your-key -e TRELLO_TOKEN=your-token -- bun run <path>/jv-trello-mcp/src/index.ts
+```
+
+(Server name must come before `-e` flags.) Or paste this into your client's MCP config:
 
 ```json
 {
   "mcpServers": {
     "jv-trello": {
       "command": "bun",
-      "args": [
-        "run",
-        "/Users/juanvieira/development/codebases/tools/mcp-server-trello/src/index.ts"
-      ],
+      "args": ["run", "<path>/jv-trello-mcp/src/index.ts"],
       "env": {
         "TRELLO_API_KEY": "your-api-key",
         "TRELLO_TOKEN": "your-token"
@@ -85,58 +123,63 @@ Receive Trello events instantly instead of polling. See [docs/trello_webhooks_se
 }
 ```
 
-```bash
-claude mcp add jv-trello -e TRELLO_API_KEY=your-key -e TRELLO_TOKEN=your-token -- bun run /Users/juanvieira/development/codebases/tools/mcp-server-trello/src/index.ts
-```
+#### Where settings get stored
 
-Note: server name must come before `-e` flags.
+| What | Where | Written by |
+|---|---|---|
+| Trello credentials (Claude Code) | `~/.claude/settings.json` (`env` block) | `setup-mcp-client.ts` or manual edit |
+| MCP allow-list (Claude Code) | `~/.claude/settings.json` (`permissions.allow`) | `setup-mcp-client.ts` |
+| MCP server registration (Gemini) | `~/.gemini/settings.json` | `gemini mcp add` (run by the script) |
+| Trello credentials (Gemini) | `.env` / `.env.local` in repo root, loaded by `scripts/start-mcp.sh` | You |
+| Board prefix registry & active board | `~/.jv-trello/config.json` | The MCP server itself, at runtime |
 
-**Optional: seed prefixes from the env var** (useful for CI/scripted setups):
+### After installation — board prefix setup
+
+Once the MCP server is connected, you'll set up short ID prefixes (e.g. `JVT-42`) for each board you want to use. The flow is fully conversational — just talk to your agent in plain language and it will run the right tool calls.
+
+**Step 1 — Ask the agent to list your boards:**
+
+> "List my Trello boards and show me their IDs."
+
+The agent will call `jv_list_boards` and return the list. Pick the boards you want to register and decide on a short prefix for each (e.g. `JVT` for "Juan's Vibe-Tasks").
+
+**Step 2 — Ask the agent to register your prefixes:**
+
+> "Register these prefixes: JVT for board `<id>`, and TATA for board `<id>`."
+
+The agent will call `jv_setup_board_prefixes` with your mappings.
+
+**Step 3 — Confirm the registry:**
+
+> "Show me my registered board prefixes."
+
+The agent will call `jv_list_board_prefixes` so you can verify everything saved.
+
+Registered prefixes are written to `~/.jv-trello/config.json` and survive restarts.
+
+**Adding a board later:**
+
+> "Register prefix PROJ for board `<id>`."
+
+One sentence is enough — no config file edit, no restart. The agent calls `jv_register_board_prefix` under the hood.
+
+**Or just ask the agent to do all of it:**
+
+Once the MCP server is connected and the skill is copied (see [Agent skill](#agent-skill) below), you can skip the three steps entirely and say:
+
+> `/jv-trello, please set up the board's settings for me.`
+
+The agent will read the skill, list your boards, ask which prefixes you want, register them, and confirm — all in one go.
+
+#### Alternative: seed prefixes from an env var (CI / scripted setups)
+
+If you'd rather skip the conversational flow (e.g. provisioning in CI), set `BOARD_PREFIXES` in your MCP config:
 
 ```json
 "BOARD_PREFIXES": "JVT:boardId1,TATA:boardId2"
 ```
 
 Env var values are merged with the persisted registry at startup. Env wins on conflict.
-
-### After installation — board prefix setup
-
-Once the MCP server is connected, run these three tool calls in Claude to map your boards to short prefixes:
-
-**Step 1 — List your boards to get their IDs:**
-
-```json
-{ "name": "jv_list_boards", "arguments": {} }
-```
-
-**Step 2 — Register your chosen prefixes:**
-
-```json
-{
-  "name": "jv_setup_board_prefixes",
-  "arguments": {
-    "mappings": [
-      { "prefix": "JVT", "boardId": "<id from step 1>" },
-      { "prefix": "TATA", "boardId": "<id from step 1>" }
-    ]
-  }
-}
-```
-
-**Step 3 — Confirm the registry:**
-
-```json
-{ "name": "jv_list_board_prefixes", "arguments": {} }
-```
-
-Registered prefixes are written to `~/.trello-mcp/config.json` and survive restarts. To add a new board later, one call is enough — no config file edit, no restart:
-
-```json
-{
-  "name": "jv_register_board_prefix",
-  "arguments": { "prefix": "PROJ", "boardId": "your-board-id" }
-}
-```
 
 ### Agent skill
 
@@ -461,7 +504,7 @@ curl https://mise.run | sh
 mise use bun@latest -g
 
 # Or just run `mise install` from the project directory to install Bun locally
-cd /path/to/mcp-server-trello
+cd /path/to/jv-trello-mcp
 mise install
 ```
 
@@ -545,7 +588,7 @@ You can get these values from:
 
 - API Key: [https://trello.com/app-key](https://trello.com/app-key)
 - Token: Generate using your API key
-- Board ID (optional, deprecated): Found in the board URL (e.g., [suspicious link removed])
+- Board ID (optional, deprecated): Found in the board URL (e.g., `https://trello.com/b/<BOARD_ID>/<board-name>`)
 - Workspace ID: Found in workspace settings or using `list_workspaces` tool
 
 ### Board and Workspace Management
@@ -559,7 +602,7 @@ Starting with version 0.3.0, the MCP server supports multiple ways to work with 
 2.  **Dynamic board selection**: Use workspace management tools
        - The `TRELLO_BOARD_ID` in your `.env` file is used as the initial/default board ID
        - You can change the active board at any time using the `set_active_board` tool
-       - The selected board persists between server restarts (stored in `~/.trello-mcp/config.json`)
+       - The selected board persists between server restarts (stored in `~/.jv-trello/config.json`)
        - Similarly, you can set and persist an active workspace using `set_active_workspace`
 
 This allows you to work with multiple boards and workspaces without restarting the server.
