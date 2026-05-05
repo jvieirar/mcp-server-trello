@@ -56,9 +56,10 @@ async function handleEvent(event: TrelloEvent): Promise<void> {
     if (label.name === 'AI_READY') {
       const cardId = card?.id ?? '';
       const cardName = card?.name ?? 'unknown';
-      const model = process.env.AGENT_MODEL ?? 'claude-sonnet-4-6';
+      const runner = process.env.AGENT_RUNNER ?? 'claude';
+      const model = process.env.AGENT_MODEL ?? (runner === 'copilot' ? 'claude-haiku-4.5' : 'claude-sonnet-4-6');
       const maxTurns = process.env.AGENT_MAX_TURNS ?? 'unlimited';
-      const msg = `[AI_READY] card="${cardName}" id=${cardId} → spawning agent model=${model} max-turns=${maxTurns}`;
+      const msg = `[AI_READY] card="${cardName}" id=${cardId} → spawning agent runner=${runner} model=${model} max-turns=${maxTurns}`;
       console.error(msg);
       await appendLog(msg);
 
@@ -76,6 +77,13 @@ async function handleEvent(event: TrelloEvent): Promise<void> {
 }
 
 export async function startWebhookServer(): Promise<void> {
+  const enabled = process.env.WEBHOOK_ENABLED !== 'false';
+
+  if (!enabled) {
+    console.error('[webhook] listener disabled via WEBHOOK_ENABLED=false');
+    return;
+  }
+
   await fs.mkdir(LOGS_DIR, { recursive: true });
   await pruneOldLogs();
 

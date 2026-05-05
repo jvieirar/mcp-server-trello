@@ -61,7 +61,7 @@ The dominant waste in the original server is `list_boards` alone — 59% of all 
 - A Trello API key and token (see [Configuration](#configuration))
 
 **Optional — real-time webhooks:**
-Receive Trello events instantly instead of polling. See [docs/trello_webhooks_setup.md](docs/trello_webhooks_setup.md) for the full setup guide (Tailscale Funnel + registration script).
+Receive Trello events instantly instead of polling. Set `WEBHOOK_ENABLED=true` and follow [docs/trello_webhooks_setup.md](docs/trello_webhooks_setup.md) for the full setup guide (Tailscale Funnel + registration script). To disable the webhook listener without removing configuration, set `WEBHOOK_ENABLED=false`.
 
 **For the short ID system** — the prefix registry is managed at runtime. No restart is ever needed.
 
