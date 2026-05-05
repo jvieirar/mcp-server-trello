@@ -4,14 +4,26 @@ import * as fs from 'fs/promises';
 import path from 'path';
 import { LOGS_DIR } from './paths.js';
 
-const DEFAULT_MODEL = 'claude-sonnet-4-6';
+type Runner = 'claude' | 'copilot';
+
+const DEFAULT_MODEL: Record<Runner, string> = {
+  claude: 'claude-sonnet-4-6',
+  copilot: 'claude-haiku-4.5',
+};
 
 function agentLogFile(cardId: string): string {
   const ts = new Date().toISOString().replace(/[:.]/g, '-');
   return path.join(LOGS_DIR, `agent-${cardId}-${ts}.log`);
 }
 
-function buildPrompt(cardId: string, cardName: string, logFile: string): string {
+function buildPrompt(cardId: string, cardName: string, logFile: string, runner: Runner, model: string): string {
+  // copilot activates the skill via slash-command prefix; claude receives explicit instructions
+  const skillInvocation = runner === 'copilot'
+    ? `/jv-trello Complete the full session setup first (board config, lifecycle labels, lists, prefix), then:`
+    : 'Steps:\n1. Invoke the jv-trello skill to set up your session (board config, labels, lists, prefix).';
+
+  const noteStep = runner === 'copilot' ? '2.' : '2.';
+
   return `\
 You are a Trello task agent. A card has just been marked AI_READY and needs your attention.
 
@@ -19,12 +31,12 @@ Card ID  : ${cardId}
 Card name: ${cardName}
 Session log: ${logFile}
 
-Steps:
-1. Invoke the jv-trello skill to set up your session (board config, labels, lists, prefix).
-2. Immediately post this [NOTE] comment on card ${cardId} so future agents and the user can find this session:
+${skillInvocation}
+${noteStep} Immediately post this [NOTE] comment on card ${cardId} so future agents and the user can find this session:
 
    [NOTE] Agent session started.
-   Model: ${process.env.AGENT_MODEL ?? DEFAULT_MODEL}
+   Runner: ${runner}
+   Model: ${model}
    Log  : ${logFile}
 
 3. Work through the card following the full jv-trello workflow:
@@ -120,8 +132,34 @@ async function streamToLog(stream: ReadableStream<Uint8Array>, logFile: string):
   }
 }
 
+function buildArgs(runner: Runner, prompt: string, model: string, maxTurns: number | null): string[] {
+  if (runner === 'copilot') {
+    return ['copilot', '-p', prompt, '--allow-all-tools', '--model', model];
+  }
+  const args = [
+    'claude', '-p', prompt,
+    '--model', model,
+    '--output-format', 'stream-json',
+    '--verbose',
+    '--allowedTools', 'mcp__jv-trello__*',
+  ];
+  if (maxTurns !== null) args.push('--max-turns', String(maxTurns));
+  return args;
+}
+
+async function pipeRaw(stream: ReadableStream<Uint8Array>, logFile: string): Promise<void> {
+  const reader = stream.getReader();
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    await fs.appendFile(logFile, value);
+  }
+}
+
 export async function spawnAgent(cardId: string, cardName: string): Promise<void> {
-  const model = process.env.AGENT_MODEL ?? DEFAULT_MODEL;
+  const rawRunner = process.env.AGENT_RUNNER ?? 'claude';
+  const runner: Runner = rawRunner === 'copilot' ? 'copilot' : 'claude';
+  const model = process.env.AGENT_MODEL ?? DEFAULT_MODEL[runner];
   const maxTurns = process.env.AGENT_MAX_TURNS ? Number(process.env.AGENT_MAX_TURNS) : null;
   const logFile = agentLogFile(cardId);
 
@@ -130,36 +168,24 @@ export async function spawnAgent(cardId: string, cardName: string): Promise<void
     logFile,
     `[agent] started  : ${new Date().toISOString()}\n` +
     `[agent] card     : ${cardName} (${cardId})\n` +
+    `[agent] runner   : ${runner}\n` +
     `[agent] model    : ${model}  max-turns: ${maxTurns ?? 'unlimited'}\n` +
     `${'─'.repeat(60)}\n`
   );
 
-  console.error(`[agent] spawning for card ${cardId}`);
+  console.error(`[agent] spawning for card ${cardId}  runner=${runner}  model=${model}`);
   console.error(`[agent] log → ${logFile}`);
 
-  const args = [
-    'claude', '-p', buildPrompt(cardId, cardName, logFile),
-    '--model', model,
-    '--output-format', 'stream-json',
-    '--verbose',
-    '--allowedTools', 'mcp__jv-trello__*',
-  ];
-  if (maxTurns !== null) args.push('--max-turns', String(maxTurns));
-
+  const prompt = buildPrompt(cardId, cardName, logFile, runner, model);
+  const args = buildArgs(runner, prompt, model, maxTurns);
   const proc = Bun.spawn(args, { stdout: 'pipe', stderr: 'pipe' });
 
-  // stderr (errors, warnings) goes straight to log unformatted
-  async function pipeStderr(stream: ReadableStream<Uint8Array>): Promise<void> {
-    const reader = stream.getReader();
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      await fs.appendFile(logFile, value);
-    }
-  }
+  const stdoutHandler = runner === 'claude'
+    ? streamToLog(proc.stdout, logFile)
+    : pipeRaw(proc.stdout, logFile);
 
   // Wait in background — webhook response is already sent
-  Promise.all([streamToLog(proc.stdout, logFile), pipeStderr(proc.stderr), proc.exited]).then(
+  Promise.all([stdoutHandler, pipeRaw(proc.stderr, logFile), proc.exited]).then(
     async ([,, code]) => {
       const footer =
         `${'─'.repeat(60)}\n` +
